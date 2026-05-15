@@ -2,7 +2,8 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install --frozen-lockfile 2>/dev/null || npm install
+# Force install ALL deps (including devDeps like typescript/vite) regardless of NODE_ENV
+RUN NODE_ENV=development npm install --include=dev
 COPY . .
 RUN npm run build
 
