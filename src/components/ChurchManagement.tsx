@@ -1,33 +1,36 @@
 import React from 'react';
-import { 
-  Church as ChurchIcon, 
-  Plus, 
-  MapPin, 
-  User, 
+import {
+  Church as ChurchIcon,
+  Plus,
+  MapPin,
+  User,
   Calendar,
-  MoreVertical,
   Trash2,
   Edit2,
   ArrowRight,
-  ChevronRight,
   Search,
   Filter,
-  Users,
   Settings,
   Activity,
   History,
   FileText,
   Mail,
-  Phone
+  Phone,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Users,
+  Layers,
+  X
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogTrigger,
   DialogFooter
 } from './ui/dialog';
@@ -37,27 +40,27 @@ import { cn } from '../lib/utils';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
 } from './ui/form';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from './ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Avatar, AvatarFallback } from './ui/avatar';
 
 const churchSchema = z.object({
   name: z.string().min(2, "Nom de l'église requis"),
@@ -70,11 +73,145 @@ const churchSchema = z.object({
   pastor: z.string().min(2, "Nom du pasteur requis"),
 });
 
-function ChurchDetail({ church, onClose }: { church: any; onClose: () => void }) {
-  const { members, children } = useStore();
-  const churchMembers = members.filter(m => m.churchId === church.id || (church.id === 'default' && !m.churchId));
-  const churchChildren = children.filter(c => c.churchId === church.id || (church.id === 'default' && !c.churchId));
+// Returns a status badge for a church
+function ChurchStatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case 'active':
+      return <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">Actif</Badge>;
+    case 'pending':
+      return <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">En attente</Badge>;
+    case 'suspended':
+      return <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">Suspendu</Badge>;
+    default:
+      return <Badge variant="outline" className="text-xs">{status}</Badge>;
+  }
+}
+
+function ChurchDetail({ church, onClose }: { church: Church & { code?: string }; onClose: () => void }) {
+  const { members, children, departments, events, transactions } = useStore();
+  const [memberSearch, setMemberSearch] = React.useState('');
+  const [memberFilter, setMemberFilter] = React.useState<'all' | 'active' | 'inactive'>('all');
+
+  const churchMembers = members.filter(m => m.churchId === church.id);
+  const churchChildren = children.filter(c => c.churchId === church.id);
   const allPeople = [...churchMembers, ...churchChildren];
+  const churchDepts = departments.filter(d => d.churchId === church.id);
+  const churchEvents = events.filter(e => e.churchId === church.id);
+  const churchTx = transactions.filter(t => t.churchId === church.id);
+
+  // Finance totals
+  const income = churchTx.filter(t => t.type !== 'expense').reduce((sum, t) => sum + t.amount, 0);
+  const expenses = churchTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  const balance = income - expenses;
+
+  // Filtered members list
+  const filteredPeople = allPeople.filter(p => {
+    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+    const matchSearch = memberSearch === '' || name.includes(memberSearch.toLowerCase());
+    const matchFilter = memberFilter === 'all' || p.status === memberFilter;
+    return matchSearch && matchFilter;
+  });
+
+  // Build recent activities from real data
+  const recentActivities: { label: string; detail: string; date: string; type: 'member' | 'finance' | 'event' }[] = [];
+
+  // Last 3 members joined
+  const recentMembers = [...churchMembers].sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime()).slice(0, 2);
+  recentMembers.forEach(m => {
+    recentActivities.push({
+      label: 'Nouveau membre',
+      detail: `${m.firstName} ${m.lastName} a rejoint l'église`,
+      date: format(new Date(m.joinedAt), 'dd MMM yyyy', { locale: fr }),
+      type: 'member'
+    });
+  });
+
+  // Last transaction
+  const lastTx = [...churchTx].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+  if (lastTx) {
+    recentActivities.push({
+      label: lastTx.type === 'expense' ? 'Dépense enregistrée' : 'Entrée financière',
+      detail: `${lastTx.category} — ${lastTx.amount.toLocaleString()} FCFA`,
+      date: format(new Date(lastTx.date), 'dd MMM yyyy', { locale: fr }),
+      type: 'finance'
+    });
+  }
+
+  // Last event
+  const lastEvent = [...churchEvents].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0];
+  if (lastEvent) {
+    recentActivities.push({
+      label: 'Événement',
+      detail: lastEvent.name,
+      date: format(new Date(lastEvent.startDate), 'dd MMM yyyy', { locale: fr }),
+      type: 'event'
+    });
+  }
+
+  // PDF download
+  const handleDownloadPDF = async () => {
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
+
+      const doc = new jsPDF();
+      const now = format(new Date(), 'MMMM yyyy', { locale: fr });
+
+      // Header
+      doc.setFontSize(18);
+      doc.setTextColor(0, 158, 96); // church-green
+      doc.text(church.name, 14, 22);
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Rapport mensuel — ${now}`, 14, 30);
+      doc.text(`Pasteur: ${church.pastor}  |  ${church.city}, ${church.country}`, 14, 36);
+
+      // Stats summary
+      doc.setFontSize(12);
+      doc.setTextColor(30, 30, 30);
+      doc.text('Statistiques générales', 14, 48);
+      autoTable(doc, {
+        startY: 52,
+        head: [['Indicateur', 'Valeur']],
+        body: [
+          ['Membres adultes', churchMembers.length.toString()],
+          ['Enfants', churchChildren.length.toString()],
+          ['Départements', churchDepts.length.toString()],
+          ['Événements', churchEvents.length.toString()],
+          ['Recettes (FCFA)', income.toLocaleString()],
+          ['Dépenses (FCFA)', expenses.toLocaleString()],
+          ['Solde (FCFA)', balance.toLocaleString()],
+        ],
+        headStyles: { fillColor: [0, 158, 96] },
+        theme: 'striped',
+      });
+
+      // Transactions
+      if (churchTx.length > 0) {
+        const finalY = (doc as any).lastAutoTable.finalY + 10;
+        doc.setFontSize(12);
+        doc.text('Transactions récentes', 14, finalY);
+        autoTable(doc, {
+          startY: finalY + 4,
+          head: [['Date', 'Type', 'Catégorie', 'Montant (FCFA)', 'Méthode']],
+          body: churchTx.slice(0, 20).map(t => [
+            format(new Date(t.date), 'dd/MM/yyyy'),
+            t.type === 'tithe' ? 'Dîme' : t.type === 'offering' ? 'Offrande' : t.type === 'donation' ? 'Don' : 'Dépense',
+            t.category,
+            t.amount.toLocaleString(),
+            t.paymentMethod
+          ]),
+          headStyles: { fillColor: [255, 130, 0] },
+          theme: 'striped',
+        });
+      }
+
+      doc.save(`rapport-${church.name.replace(/\s+/g, '-')}-${now}.pdf`);
+      toast.success('Rapport PDF téléchargé !');
+    } catch (err) {
+      toast.error('Erreur lors de la génération du PDF');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -85,7 +222,7 @@ function ChurchDetail({ church, onClose }: { church: any; onClose: () => void })
         <div>
           <h2 className="text-2xl font-serif font-bold text-slate-900">{church.name}</h2>
           <div className="flex items-center gap-2 mt-1">
-            <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">Active</Badge>
+            <ChurchStatusBadge status={church.status} />
             {church.id === 'default' && <Badge className="bg-church-gold text-white">Siège</Badge>}
           </div>
         </div>
@@ -101,6 +238,7 @@ function ChurchDetail({ church, onClose }: { church: any; onClose: () => void })
               <TabsTrigger value="finances">Finances</TabsTrigger>
             </TabsList>
 
+            {/* ── Overview ──────────────────────────────── */}
             <TabsContent value="overview" className="mt-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card className="border-none shadow-sm">
@@ -159,9 +297,7 @@ function ChurchDetail({ church, onClose }: { church: any; onClose: () => void })
                   <CardTitle className="text-sm font-bold">À propos de cette branche</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-slate-600 leading-relaxed">
-                    {church.description}
-                  </p>
+                  <p className="text-sm text-slate-600 leading-relaxed">{church.description}</p>
                 </CardContent>
               </Card>
 
@@ -169,35 +305,50 @@ function ChurchDetail({ church, onClose }: { church: any; onClose: () => void })
                 <Card className="bg-church-green text-white border-none shadow-sm">
                   <CardContent className="p-4">
                     <p className="text-[10px] uppercase font-bold opacity-70">Membres Actifs</p>
-                    <p className="text-2xl font-bold">{churchMembers.length}</p>
+                    <p className="text-2xl font-bold">{churchMembers.filter(m => m.status === 'active').length}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-church-gold text-white border-none shadow-sm">
                   <CardContent className="p-4">
                     <p className="text-[10px] uppercase font-bold opacity-70">Départements</p>
-                    <p className="text-2xl font-bold">5</p>
+                    <p className="text-2xl font-bold">{churchDepts.length}</p>
                   </CardContent>
                 </Card>
                 <Card className="bg-slate-900 text-white border-none shadow-sm">
                   <CardContent className="p-4">
                     <p className="text-[10px] uppercase font-bold opacity-70">Événements</p>
-                    <p className="text-2xl font-bold">12</p>
+                    <p className="text-2xl font-bold">{churchEvents.length}</p>
                   </CardContent>
                 </Card>
               </div>
             </TabsContent>
 
+            {/* ── Members ───────────────────────────────── */}
             <TabsContent value="members" className="mt-6">
               <Card className="border-none shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                  <div className="relative w-64">
+                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/50">
+                  <div className="relative w-full sm:w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <Input placeholder="Rechercher un membre..." className="pl-9 h-9 text-xs rounded-lg" />
+                    <Input
+                      placeholder="Rechercher un membre..."
+                      className="pl-9 h-9 text-xs rounded-lg"
+                      value={memberSearch}
+                      onChange={e => setMemberSearch(e.target.value)}
+                    />
                   </div>
-                  <Button size="sm" variant="outline" className="h-9 text-xs">
-                    <Filter className="w-3 h-3 mr-2" />
-                    Filtrer
-                  </Button>
+                  <div className="flex gap-2">
+                    {(['all', 'active', 'inactive'] as const).map(f => (
+                      <Button
+                        key={f}
+                        size="sm"
+                        variant={memberFilter === f ? 'default' : 'outline'}
+                        className={cn('h-9 text-xs', memberFilter === f ? 'bg-church-green text-white border-none' : 'border-slate-200')}
+                        onClick={() => setMemberFilter(f)}
+                      >
+                        {f === 'all' ? 'Tous' : f === 'active' ? 'Actifs' : 'Inactifs'}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
                 <Table>
                   <TableHeader>
@@ -209,84 +360,228 @@ function ChurchDetail({ church, onClose }: { church: any; onClose: () => void })
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {allPeople.slice(0, 50).map((person) => (
-                      <TableRow key={person.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback>{person.firstName[0]}{person.lastName[0]}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col">
-                              <p className="text-sm font-medium leading-none">{person.firstName} {person.lastName}</p>
-                              <p className="text-[10px] font-mono font-bold text-church-gold mt-1">
-                                <span className="text-[9px] text-slate-400 font-bold uppercase mr-1">Matricule:</span>
-                                {person.matricule || '---'}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {'groups' in person ? (person.groups.map(g => (
-                              <Badge key={g} variant="secondary" className="text-[9px] h-4">{g}</Badge>
-                            ))) : (
-                              <Badge variant="outline" className="text-[9px] h-4 text-blue-600 bg-blue-50 border-blue-100">Enfant ({person.ageGroup})</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={cn(
-                            "border-none text-[10px] h-5",
-                            person.status === 'active' ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100" : "bg-slate-100 text-slate-700 hover:bg-slate-100"
-                          )}>
-                            {person.status === 'active' ? 'Actif' : 'Inactif'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <ArrowRight className="w-4 h-4 text-slate-400" />
-                          </Button>
+                    {filteredPeople.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-sm text-slate-400 py-8">
+                          Aucun membre trouvé
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      filteredPeople.slice(0, 50).map((person) => (
+                        <TableRow key={person.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-xs bg-church-green/10 text-church-green">
+                                  {person.firstName[0]}{person.lastName[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <p className="text-sm font-medium leading-none">{person.firstName} {person.lastName}</p>
+                                <p className="text-[10px] font-mono font-bold text-church-gold mt-1">
+                                  <span className="text-[9px] text-slate-400 font-bold uppercase mr-1">Matricule:</span>
+                                  {person.matricule || '---'}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {'groups' in person ? (
+                                person.groups.length > 0
+                                  ? person.groups.map(g => (
+                                    <Badge key={g} variant="secondary" className="text-[9px] h-4">{g}</Badge>
+                                  ))
+                                  : <span className="text-xs text-slate-400">—</span>
+                              ) : (
+                                <Badge variant="outline" className="text-[9px] h-4 text-blue-600 bg-blue-50 border-blue-100">
+                                  Enfant ({(person as any).ageGroup})
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={cn(
+                              "border-none text-[10px] h-5",
+                              person.status === 'active'
+                                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
+                                : "bg-slate-100 text-slate-700 hover:bg-slate-100"
+                            )}>
+                              {person.status === 'active' ? 'Actif' : 'Inactif'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => toast.info(`Fiche de ${person.firstName} ${person.lastName} — accès depuis le menu Membres`)}
+                            >
+                              <ArrowRight className="w-4 h-4 text-slate-400" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
-                <div className="p-4 text-center border-t border-slate-100 italic text-[10px] text-slate-400">
-                  Affichage des 5 derniers membres inscrits
-                </div>
+                {filteredPeople.length > 50 && (
+                  <div className="p-4 text-center border-t border-slate-100 italic text-[10px] text-slate-400">
+                    Affichage de 50 sur {filteredPeople.length} personnes
+                  </div>
+                )}
               </Card>
             </TabsContent>
 
+            {/* ── Departments ───────────────────────────── */}
             <TabsContent value="departments" className="mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {['Jeunesse', 'Lourange', 'Accueil', 'Evangélisation'].map((dept) => (
-                    <Card key={dept} className="border-none shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-center">
-                        <CardTitle className="text-sm font-bold">{dept}</CardTitle>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => toast.info("Gestion des rôles bientôt disponible")}>
-                          <Settings className="w-3 h-3 text-slate-400" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex -space-x-2">
-                        {[1, 2, 3].map(i => (
-                          <Avatar key={i} className="h-6 w-6 ring-2 ring-white">
-                            <AvatarFallback className="text-[8px] bg-slate-100">U{i}</AvatarFallback>
-                          </Avatar>
-                        ))}
-                        <div className="h-6 w-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-[8px] text-slate-400">+12</div>
-                      </div>
-                      <Button variant="outline" className="w-full h-8 text-[10px] border-dashed" onClick={() => toast.info("Accès à la modification du département")}>Modifier le département</Button>
-                    </CardContent>
-                  </Card>
-                ))}
+              {churchDepts.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  <Layers className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">Aucun département pour cette église</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {churchDepts.map((dept) => {
+                    const deptMemberCount = members.filter(m => m.groups.includes(dept.name) && m.churchId === church.id).length;
+                    return (
+                      <Card key={dept.id} className="border-none shadow-sm hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-2">
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: dept.color }} />
+                              <CardTitle className="text-sm font-bold">{dept.name}</CardTitle>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => toast.info("Gestion du département depuis le menu Organisation")}
+                            >
+                              <Settings className="w-3 h-3 text-slate-400" />
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <p className="text-xs text-slate-500">{dept.description}</p>
+                          <div className="flex items-center justify-between text-xs text-slate-500">
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              {deptMemberCount} membre{deptMemberCount > 1 ? 's' : ''}
+                            </span>
+                            <Badge variant="outline" className={cn(
+                              "text-[9px]",
+                              dept.status === 'active' ? 'text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-slate-500 bg-slate-50'
+                            )}>
+                              {dept.status === 'active' ? 'Actif' : 'En pause'}
+                            </Badge>
+                          </div>
+                          <p className="text-[10px] text-slate-400 italic">
+                            Réunion: {dept.meetingDays.join(', ')} {dept.meetingTime && `à ${dept.meetingTime}`}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* ── Finances ──────────────────────────────── */}
+            <TabsContent value="finances" className="mt-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="border-none shadow-sm bg-emerald-50">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 rounded-lg">
+                      <TrendingUp className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-emerald-600 font-bold uppercase">Recettes</p>
+                      <p className="text-lg font-bold text-emerald-700">{income.toLocaleString()} FCFA</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-none shadow-sm bg-red-50">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="p-2 bg-red-100 rounded-lg">
+                      <TrendingDown className="w-4 h-4 text-red-600" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-red-600 font-bold uppercase">Dépenses</p>
+                      <p className="text-lg font-bold text-red-700">{expenses.toLocaleString()} FCFA</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className={cn("border-none shadow-sm", balance >= 0 ? 'bg-slate-900' : 'bg-red-900')}>
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className="p-2 bg-white/10 rounded-lg">
+                      <DollarSign className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-white/70 font-bold uppercase">Solde</p>
+                      <p className="text-lg font-bold text-white">{balance.toLocaleString()} FCFA</p>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
+
+              <Card className="border-none shadow-sm overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold">Transactions récentes</CardTitle>
+                </CardHeader>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Catégorie</TableHead>
+                      <TableHead>Méthode</TableHead>
+                      <TableHead className="text-right">Montant</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {churchTx.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-sm text-slate-400 py-8">
+                          Aucune transaction enregistrée
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      [...churchTx]
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .slice(0, 20)
+                        .map(t => (
+                          <TableRow key={t.id}>
+                            <TableCell className="text-xs">{format(new Date(t.date), 'dd MMM yyyy', { locale: fr })}</TableCell>
+                            <TableCell>
+                              <Badge className={cn(
+                                "text-[9px] border-none",
+                                t.type === 'expense' ? 'bg-red-100 text-red-700' :
+                                t.type === 'tithe' ? 'bg-church-green/10 text-church-green' :
+                                'bg-church-gold/10 text-church-gold'
+                              )}>
+                                {t.type === 'tithe' ? 'Dîme' : t.type === 'offering' ? 'Offrande' : t.type === 'donation' ? 'Don' : 'Dépense'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-slate-600">{t.category}</TableCell>
+                            <TableCell className="text-xs text-slate-500">{t.paymentMethod}</TableCell>
+                            <TableCell className={cn(
+                              "text-right text-sm font-bold",
+                              t.type === 'expense' ? 'text-red-600' : 'text-emerald-600'
+                            )}>
+                              {t.type === 'expense' ? '-' : '+'}{t.amount.toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                    )}
+                  </TableBody>
+                </Table>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>
 
+        {/* ── Right sidebar ─────────────────────────── */}
         <div className="space-y-6">
           <Card className="border-none shadow-sm">
             <CardHeader>
@@ -296,23 +591,33 @@ function ChurchDetail({ church, onClose }: { church: any; onClose: () => void })
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {[
-                { label: 'Nouveau membre', detail: 'Jean Kouassi a rejoint', date: 'il y a 2h' },
-                { label: 'Offrande enregistrée', detail: 'Culte du matin', date: 'Hier' },
-                { label: 'Projet lancé', detail: 'Rénovation toiture', date: '2 jours' }
-              ].map((act, i) => (
-                <div key={i} className="flex gap-3 relative pb-4 border-l border-slate-100 pl-4 last:border-0 last:pb-0">
-                  <div className="absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full bg-church-gold ring-4 ring-white" />
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">{act.label}</p>
-                    <p className="text-[10px] text-slate-500">{act.detail}</p>
-                    <p className="text-[9px] text-slate-300 mt-1">{act.date}</p>
+              {recentActivities.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center">Aucune activité récente</p>
+              ) : (
+                recentActivities.slice(0, 5).map((act, i) => (
+                  <div key={i} className="flex gap-3 relative pb-4 border-l border-slate-100 pl-4 last:border-0 last:pb-0">
+                    <div className={cn(
+                      "absolute left-[-5px] top-1 w-2.5 h-2.5 rounded-full ring-4 ring-white",
+                      act.type === 'member' ? 'bg-church-green' :
+                      act.type === 'finance' ? 'bg-church-gold' : 'bg-slate-400'
+                    )} />
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">{act.label}</p>
+                      <p className="text-[10px] text-slate-500">{act.detail}</p>
+                      <p className="text-[9px] text-slate-300 mt-1">{act.date}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
             <CardFooter>
-              <Button variant="ghost" className="w-full text-[10px] text-slate-400">Voir tout l'historique</Button>
+              <Button
+                variant="ghost"
+                className="w-full text-[10px] text-slate-400"
+                onClick={() => toast.info("Historique complet disponible dans les rapports")}
+              >
+                Voir tout l'historique
+              </Button>
             </CardFooter>
           </Card>
 
@@ -326,7 +631,12 @@ function ChurchDetail({ church, onClose }: { church: any; onClose: () => void })
                 </div>
                 <h3 className="text-lg font-serif font-bold">Générer le rapport mensuel</h3>
                 <p className="text-white/60 text-[10px]">Collectez automatiquement les statistiques de fréquentation et financières.</p>
-                <Button className="w-full bg-church-gold hover:bg-church-gold/90 text-white border-none h-10 text-xs">Télécharger PDF</Button>
+                <Button
+                  className="w-full bg-church-gold hover:bg-church-gold/90 text-white border-none h-10 text-xs"
+                  onClick={handleDownloadPDF}
+                >
+                  Télécharger PDF
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -373,10 +683,7 @@ export function ChurchManagement() {
   });
 
   const onSubmit = (values: z.infer<typeof churchSchema>) => {
-    addChurch({
-      ...values,
-      status: 'active'
-    });
+    addChurch({ ...values, status: 'active' });
     setIsAddDialogOpen(false);
     form.reset();
     toast.success("Nouvelle branche ajoutée");
@@ -406,9 +713,12 @@ export function ChurchManagement() {
     setIsEditDialogOpen(true);
   };
 
-  const selectedChurch = selectedChurchId === 'default' ? {
+  // For the "Siège" (HQ) card, we build a Church-compatible object from store context
+  // (The HQ is not in the churches array — it's the platform's own pseudo-church)
+  const hqChurch: Church & { code: string } = {
     id: 'default',
-    name: 'Grace-Connect - Siège',
+    name: 'Grace-Connect — Siège',
+    code: '0001',
     address: 'Abidjan, Côte d\'Ivoire',
     city: 'Abidjan',
     country: 'Côte d\'Ivoire',
@@ -416,11 +726,16 @@ export function ChurchManagement() {
     createdAt: '2010-01-01',
     email: 'siege@graceconnect.app',
     phone: '+225 00 00 00 00',
-    description: 'Centre de coordination principal pour Grace-Connect.'
-  } : churches.find(c => c.id === selectedChurchId);
+    description: 'Centre de coordination principal pour Grace-Connect.',
+    status: 'active',
+  };
+
+  const selectedChurch = selectedChurchId === 'default'
+    ? hqChurch
+    : churches.find(c => c.id === selectedChurchId);
 
   if (selectedChurch) {
-    return <ChurchDetail church={selectedChurch} onClose={() => setSelectedChurchId(null)} />;
+    return <ChurchDetail church={selectedChurch as Church} onClose={() => setSelectedChurchId(null)} />;
   }
 
   const handleDeleteConfirm = () => {
@@ -438,13 +753,12 @@ export function ChurchManagement() {
           <h1 className="text-3xl font-serif font-bold text-slate-900">Gestion des Églises</h1>
           <p className="text-slate-500">Gérez vos différentes branches et lieux de culte.</p>
         </div>
+
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger render={
-            <Button className="bg-church-green hover:bg-church-green/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Ajouter une Branche
-            </Button>
-          } />
+          <DialogTrigger render={<Button className="bg-church-green hover:bg-church-green/90" />}>
+            <Plus className="w-4 h-4 mr-2" />
+            Ajouter une Branche
+          </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Nouvelle Branche</DialogTitle>
@@ -569,7 +883,7 @@ export function ChurchManagement() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Default Church / Headquarters */}
+        {/* Siège Central (HQ) — always shown first */}
         <Card className="border-none shadow-sm overflow-hidden border-l-4 border-church-gold">
           <CardHeader className="bg-slate-50/50">
             <div className="flex justify-between items-start">
@@ -578,7 +892,7 @@ export function ChurchManagement() {
               </div>
               <Badge className="bg-church-gold text-church-green">Siège Central</Badge>
             </div>
-            <CardTitle className="mt-4">Grace-Connect - Siège</CardTitle>
+            <CardTitle className="mt-4">Grace-Connect — Siège</CardTitle>
             <div className="mt-1 flex items-center gap-2">
               <span className="text-[10px] text-slate-400 font-bold uppercase">Code:</span>
               <span className="text-[10px] font-mono font-bold text-church-gold">0001</span>
@@ -609,7 +923,7 @@ export function ChurchManagement() {
           </CardFooter>
         </Card>
 
-        {/* Dynamic Churches */}
+        {/* Dynamic churches */}
         {churches.map((church) => (
           <Card key={church.id} className="border-none shadow-sm overflow-hidden">
             <CardHeader className="bg-slate-50/50">
@@ -617,21 +931,12 @@ export function ChurchManagement() {
                 <div className="p-2 bg-church-green/10 rounded-lg">
                   <ChurchIcon className="w-6 h-6 text-church-green" />
                 </div>
-                <div className="flex gap-1">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8"
-                    onClick={() => handleEdit(church)}
-                  >
+                <div className="flex items-center gap-1">
+                  <ChurchStatusBadge status={church.status} />
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(church)}>
                     <Edit2 className="w-4 h-4 text-slate-400 hover:text-church-green" />
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8"
-                    onClick={() => setChurchToDelete(church)}
-                  >
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setChurchToDelete(church)}>
                     <Trash2 className="w-4 h-4 text-slate-400 hover:text-red-600" />
                   </Button>
                 </div>
@@ -669,6 +974,7 @@ export function ChurchManagement() {
         ))}
       </div>
 
+      {/* Delete confirmation dialog */}
       <Dialog open={!!churchToDelete} onOpenChange={(open) => !open && setChurchToDelete(null)}>
         <DialogContent className="sm:max-w-[400px] rounded-3xl p-8 border-none shadow-2xl">
           <DialogHeader className="space-y-4">
@@ -678,18 +984,19 @@ export function ChurchManagement() {
             <DialogTitle className="text-2xl font-serif font-bold text-center text-slate-900">Confirmer la suppression</DialogTitle>
           </DialogHeader>
           <div className="py-6 text-center text-slate-600">
-            Êtes-vous sûr de vouloir supprimer la branche <span className="font-bold text-slate-900">"{churchToDelete?.name}"</span> ? 
-            Cette action est irréversible et supprimera toutes les données associées.
+            Êtes-vous sûr de vouloir supprimer la branche{' '}
+            <span className="font-bold text-slate-900">"{churchToDelete?.name}"</span> ?{' '}
+            Cette action est irréversible et supprimera toutes les données associées (membres, départements, événements, transactions).
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full sm:flex-1 h-12 rounded-xl font-bold border-slate-200"
               onClick={() => setChurchToDelete(null)}
             >
               Annuler
             </Button>
-            <Button 
+            <Button
               className="w-full sm:flex-1 h-12 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold"
               onClick={handleDeleteConfirm}
             >
@@ -699,6 +1006,7 @@ export function ChurchManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -712,14 +1020,11 @@ export function ChurchManagement() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nom de l'église</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
+                    <FormControl><Input {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               {churchToEdit?.code && (
                 <div className="space-y-2">
                   <FormLabel className="text-slate-500">Code Église (Lecture seule)</FormLabel>
@@ -734,9 +1039,7 @@ export function ChurchManagement() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Adresse</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
+                    <FormControl><Input {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -748,9 +1051,7 @@ export function ChurchManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Ville</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
+                      <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -761,9 +1062,7 @@ export function ChurchManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Pays</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
+                      <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -776,9 +1075,7 @@ export function ChurchManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Téléphone</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
+                      <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -789,9 +1086,7 @@ export function ChurchManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
+                      <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -803,9 +1098,7 @@ export function ChurchManagement() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
+                    <FormControl><Input {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -816,9 +1109,7 @@ export function ChurchManagement() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Pasteur Responsable</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
+                    <FormControl><Input {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

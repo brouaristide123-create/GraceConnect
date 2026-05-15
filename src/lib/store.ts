@@ -1382,10 +1382,10 @@ export const useStore = create<AppState>()(
         { id: '3', firstName: 'Kouassi', lastName: 'Bertin', email: 'k.bertin@email.com', role: 'responsible', status: 'active', lastLogin: '2026-04-08T08:45:00Z', churchId: '1', createdAt: '2024-01-10' },
       ],
       platformStats: {
-        totalChurches: 3,
+        totalChurches: 4,
         activeChurches: 3,
         suspendedChurches: 0,
-        pendingChurches: 0,
+        pendingChurches: 1,
         totalRevenue: 250000,
         totalUsers: 450
       },
@@ -1801,21 +1801,59 @@ export const useStore = create<AppState>()(
           code = Math.floor(1000 + Math.random() * 9000).toString();
         } while (existingCodes.includes(code));
 
+        const newChurches = [...state.churches, {
+          ...church,
+          id: crypto.randomUUID(),
+          code,
+          createdAt: new Date().toISOString()
+        }];
         return {
-          churches: [...state.churches, { 
-            ...church, 
-            id: crypto.randomUUID(), 
-            code,
-            createdAt: new Date().toISOString() 
-          }]
+          churches: newChurches,
+          platformStats: {
+            ...state.platformStats,
+            totalChurches: newChurches.length,
+            activeChurches: newChurches.filter(c => c.status === 'active').length,
+            pendingChurches: newChurches.filter(c => c.status === 'pending').length,
+            suspendedChurches: newChurches.filter(c => c.status === 'suspended').length,
+          }
         };
       }),
-      updateChurch: (id, church) => set((state) => ({
-        churches: state.churches.map((c) => (c.id === id ? { ...c, ...church } : c))
-      })),
-      deleteChurch: (id) => set((state) => ({
-        churches: state.churches.filter((c) => c.id !== id)
-      })),
+      updateChurch: (id, church) => set((state) => {
+        const updatedChurches = state.churches.map((c) => (c.id === id ? { ...c, ...church } : c));
+        return {
+          churches: updatedChurches,
+          platformStats: {
+            ...state.platformStats,
+            totalChurches: updatedChurches.length,
+            activeChurches: updatedChurches.filter(c => c.status === 'active').length,
+            pendingChurches: updatedChurches.filter(c => c.status === 'pending').length,
+            suspendedChurches: updatedChurches.filter(c => c.status === 'suspended').length,
+          }
+        };
+      }),
+      deleteChurch: (id) => set((state) => {
+        const churchDepts = state.departments.filter(d => d.churchId === id).map(d => d.id);
+        return {
+          churches: state.churches.filter((c) => c.id !== id),
+          members: state.members.filter((m) => m.churchId !== id),
+          children: state.children.filter((c) => c.churchId !== id),
+          departments: state.departments.filter((d) => d.churchId !== id),
+          departmentMembers: state.departmentMembers.filter((dm) => !churchDepts.includes(dm.departmentId)),
+          departmentActivities: state.departmentActivities.filter((da) => !churchDepts.includes(da.departmentId)),
+          events: state.events.filter((e) => e.churchId !== id),
+          services: state.services.filter((s) => s.churchId !== id),
+          transactions: state.transactions.filter((t) => t.churchId !== id),
+          attendance: state.attendance.filter((a) => a.churchId !== id),
+          subscriptions: state.subscriptions.filter((s) => s.churchId !== id),
+          platformStats: {
+            ...state.platformStats,
+            totalChurches: state.churches.filter(c => c.id !== id).length,
+            activeChurches: state.churches.filter(c => c.id !== id && c.status === 'active').length,
+            pendingChurches: state.churches.filter(c => c.id !== id && c.status === 'pending').length,
+            suspendedChurches: state.churches.filter(c => c.id !== id && c.status === 'suspended').length,
+          }
+        };
+      }),
       
       addMember: (member) => set((state) => {
         const church = state.churches.find(c => c.id === member.churchId);
