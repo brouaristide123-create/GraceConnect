@@ -25,4 +25,4 @@ COPY --from=frontend-builder /app/dist ./backend/public
 
 EXPOSE 4000
 
-CMD sh -c "cd backend && npx prisma migrate deploy && node server.js"
+CMD sh -c "cd backend && npx prisma migrate deploy && node seed.js && node server.js"
