@@ -49,6 +49,7 @@ import { ChurchesPage } from './components/ChurchesPage';
 import { ListingsPage } from './components/ListingsPage';
 import { RecentActivitiesPage } from './components/RecentActivitiesPage';
 import { SettingsManagement } from './components/SettingsManagement';
+import { SuiviSpirituelManagement } from './components/SuiviSpirituelManagement';
 
 export default function App() {
   const { isAuthenticated, currentUser } = useStore();
@@ -115,12 +116,16 @@ export default function App() {
                     {/* Membres */}
                     <Route path="/members" element={<MemberManagement />} />
                     <Route path="/children" element={<ChildrenManagement />} />
-                    
+
+                    {/* Suivi Spirituel */}
+                    <Route path="/spiritual" element={<SuiviSpirituelManagement />} />
+
                     {/* Finances */}
                     <Route path="/finances" element={<FinanceManagement />} />
                     <Route path="/finances/contributions" element={<ContributionsManagement />} />
                     <Route path="/finances/funeral-fund" element={<FuneralManagement />} />
                     <Route path="/finances/projects" element={<ProjectManagement />} />
+                    <Route path="/finances/cash-registers" element={<FinanceManagement />} />
                     
                     {/* Autres sections */}
                     <Route path="/assignments" element={<AssignmentManagement />} />

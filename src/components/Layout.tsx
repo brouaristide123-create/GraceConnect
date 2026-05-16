@@ -29,7 +29,9 @@ import {
   BarChart3,
   UserCog,
   LogOut,
-  Activity
+  Activity,
+  Landmark,
+  Heart
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
@@ -62,24 +64,26 @@ const navItems = [
       { name: 'Baptêmes & Mariages', href: '/organisation/ceremonies', icon: HeartHandshake },
     ]
   },
-  { 
-    name: 'Membres', 
-    href: '/members', 
+  {
+    name: 'Membres',
+    href: '/members',
     icon: Users,
     subItems: [
       { name: 'Adultes', href: '/members', icon: Users },
       { name: 'Enfants', href: '/children', icon: Baby },
     ]
   },
-  { 
-    name: 'Finances', 
-    href: '/finances', 
+  { name: 'Suivi Spirituel', href: '/spiritual', icon: Heart },
+  {
+    name: 'Finances',
+    href: '/finances',
     icon: Wallet,
     subItems: [
       { name: "Vue d'ensemble", href: '/finances', icon: BarChart3 },
       { name: 'Cotisations', href: '/finances/contributions', icon: Coins },
       { name: 'Cas de Décès', href: '/finances/funeral-fund', icon: HeartHandshake },
       { name: 'Projets Église', href: '/finances/projects', icon: Building2 },
+      { name: 'Caisses', href: '/finances/cash-registers', icon: Landmark },
     ]
   },
   { name: 'Affectations', href: '/assignments', icon: ClipboardList },
