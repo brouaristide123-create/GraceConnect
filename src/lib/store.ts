@@ -2473,7 +2473,7 @@ export const useStore = create<AppState>()(
       })),
     }),
     {
-      name: 'ekklesia-africa-storage-v4',
+      name: 'GraceConnect',
     }
   )
 );
