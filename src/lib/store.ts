@@ -885,23 +885,46 @@ export interface CashRegister {
   name: string;
   description?: string;
   churchId: string;
-  linkedTo?: { type: 'event' | 'service' | 'general'; id?: string; name?: string };
+  type?: 'principale' | 'projet' | 'departement' | 'evenement' | 'assistance' | 'formation' | 'autre';
+  typeCustom?: string;
+  linkedTo?: { type: 'event' | 'service' | 'general' | 'department'; id?: string; name?: string };
+  cashierId?: string;
+  cashierName?: string;
+  responsibleId?: string;
+  responsibleName?: string;
+  initialBalance?: number;
   balance: number;
-  createdAt: string;
   isActive: boolean;
+  allowExpenses?: boolean;
+  allowExternalContributions?: boolean;
+  color?: string;
+  icon?: string;
+  alertThreshold?: number;
+  createdAt: string;
 }
 
 export interface CashTransaction {
   id: string;
   registerId: string;
-  type: 'income' | 'expense' | 'donation' | 'offering' | 'tithe' | 'transfer';
+  type: 'income' | 'expense' | 'transfer_in' | 'transfer_out'
+    | 'donation' | 'offering' | 'tithe' | 'contribution' | 'event_payment'
+    | 'assistance' | 'purchase' | 'invoice' | 'works';
   amount: number;
   description: string;
   category: string;
-  paymentMethod: 'Cash' | 'Mobile Money' | 'Bank' | 'Wave' | 'Djamo';
+  paymentMethod: 'Espèces' | 'Mobile Money' | 'Virement' | 'Carte' | 'Wave' | 'Djamo' | 'Cash' | 'Bank';
   date: string;
   authorId?: string;
+  authorName?: string;
+  sourceOrBeneficiary?: string;
   notes?: string;
+  attachmentType?: 'receipt' | 'invoice' | 'photo';
+  transferToRegisterId?: string;
+  transferFromRegisterId?: string;
+  transferMotif?: string;
+  validationStatus?: 'pending' | 'approved' | 'rejected';
+  validatedBy?: string;
+  validatedAt?: string;
 }
 
 interface AppState {
@@ -1038,6 +1061,8 @@ interface AppState {
   updateCashRegister: (id: string, register: Partial<CashRegister>) => void;
   deleteCashRegister: (id: string) => void;
   addCashTransaction: (transaction: Omit<CashTransaction, 'id'>) => void;
+  transferBetweenRegisters: (fromId: string, toId: string, amount: number, motif?: string, authorId?: string, authorName?: string) => void;
+  validateTransaction: (transactionId: string, status: 'approved' | 'rejected', validatedBy: string) => void;
 
   addChildCheckIn: (checkIn: Omit<ChildCheckIn, 'id'>) => void;
   updateChildCheckIn: (id: string, checkIn: Partial<ChildCheckIn>) => void;
@@ -2081,13 +2106,81 @@ export const useStore = create<AppState>()(
         cashRegisters: state.cashRegisters.filter((r) => r.id !== id)
       })),
       addCashTransaction: (transaction) => set((state) => {
+        const INCOME_TYPES = ['income', 'donation', 'offering', 'tithe', 'contribution', 'event_payment', 'transfer_in'];
+        const EXPENSE_TYPES = ['expense', 'assistance', 'purchase', 'invoice', 'works', 'transfer_out'];
+        const delta = INCOME_TYPES.includes(transaction.type)
+          ? transaction.amount
+          : EXPENSE_TYPES.includes(transaction.type)
+            ? -transaction.amount
+            : 0;
         const reg = state.cashRegisters.find(r => r.id === transaction.registerId);
-        const delta = (transaction.type === 'expense') ? -transaction.amount : transaction.amount;
         return {
           cashTransactions: [...state.cashTransactions, { ...transaction, id: crypto.randomUUID() }],
           cashRegisters: reg
             ? state.cashRegisters.map(r => r.id === transaction.registerId ? { ...r, balance: r.balance + delta } : r)
             : state.cashRegisters
+        };
+      }),
+
+      transferBetweenRegisters: (fromId, toId, amount, motif, authorId, authorName) => set((state) => {
+        const now = new Date().toISOString();
+        const txId1 = crypto.randomUUID();
+        const txId2 = crypto.randomUUID();
+        const outTx: CashTransaction = {
+          id: txId1,
+          registerId: fromId,
+          type: 'transfer_out',
+          amount,
+          description: motif || 'Transfert entre caisses',
+          category: 'Transfert',
+          paymentMethod: 'Virement',
+          date: now,
+          authorId,
+          authorName,
+          transferToRegisterId: toId,
+          transferMotif: motif,
+          validationStatus: 'approved',
+        };
+        const inTx: CashTransaction = {
+          id: txId2,
+          registerId: toId,
+          type: 'transfer_in',
+          amount,
+          description: motif || 'Transfert entre caisses',
+          category: 'Transfert',
+          paymentMethod: 'Virement',
+          date: now,
+          authorId,
+          authorName,
+          transferFromRegisterId: fromId,
+          transferMotif: motif,
+          validationStatus: 'approved',
+        };
+        return {
+          cashTransactions: [...state.cashTransactions, outTx, inTx],
+          cashRegisters: state.cashRegisters.map(r => {
+            if (r.id === fromId) return { ...r, balance: r.balance - amount };
+            if (r.id === toId) return { ...r, balance: r.balance + amount };
+            return r;
+          }),
+        };
+      }),
+
+      validateTransaction: (transactionId, status, validatedBy) => set((state) => {
+        const tx = state.cashTransactions.find(t => t.id === transactionId);
+        if (!tx) return state;
+        const delta = status === 'approved'
+          ? (['expense', 'assistance', 'purchase', 'invoice', 'works', 'transfer_out'].includes(tx.type) ? -tx.amount : tx.amount)
+          : 0;
+        return {
+          cashTransactions: state.cashTransactions.map(t =>
+            t.id === transactionId
+              ? { ...t, validationStatus: status, validatedBy, validatedAt: new Date().toISOString() }
+              : t
+          ),
+          cashRegisters: status === 'approved' && delta !== 0
+            ? state.cashRegisters.map(r => r.id === tx.registerId ? { ...r, balance: r.balance + delta } : r)
+            : state.cashRegisters,
         };
       }),
 
