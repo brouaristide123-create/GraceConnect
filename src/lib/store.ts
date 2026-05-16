@@ -1489,18 +1489,18 @@ export const useStore = create<AppState>()(
       },
       logout: () => set({ isAuthenticated: false, currentUser: null }),
       members: [
-        { id: '1', firstName: 'Jean', lastName: 'Koffi', matricule: '26-4827-0001-H', email: 'jean.koffi@email.com', phone: '0707070707', churchId: '1', groups: ['Conseil', 'Chorale'], status: 'active', joinedAt: '2023-01-15', gender: 'M', engagementLevel: 'leader', role: 'Ancien', isBaptized: true },
-        { id: '2', firstName: 'Marie', lastName: 'Nguessan', matricule: '26-4827-0002-F', email: 'marie.n@email.com', phone: '0505050505', churchId: '1', groups: ['Femmes'], status: 'active', joinedAt: '2023-03-20', gender: 'F', engagementLevel: 'active', isBaptized: true },
-        { id: '3', firstName: 'Kouassi', lastName: 'Bertin', matricule: '26-0001-0003-H', email: 'k.bertin@email.com', phone: '0101010101', churchId: 'default', groups: ['Jeunesse'], status: 'active', joinedAt: '2024-01-10', gender: 'M', engagementLevel: 'new', isBaptized: false },
-        { id: '4', firstName: 'Awa', lastName: 'Coulibaly', matricule: '26-4827-0004-F', email: 'awa.c@email.com', phone: '0808080808', churchId: '1', groups: ['Chorale'], status: 'active', joinedAt: '2024-02-05', gender: 'F', engagementLevel: 'leader', role: 'Maître de Chœur', isBaptized: true },
-        { id: '5', firstName: 'Paul', lastName: 'Yao', matricule: '26-0001-0005-H', email: 'paul.yao@email.com', phone: '0909090909', churchId: 'default', groups: ['Sécurité'], status: 'inactive', joinedAt: '2022-11-12', gender: 'M', engagementLevel: 'new', role: 'Diacre', isBaptized: true },
+        { id: '1', firstName: 'Jean', lastName: 'Koffi', matricule: '3847291JK', email: 'jean.koffi@email.com', phone: '0707070707', churchId: '1', groups: ['Conseil', 'Chorale'], status: 'active', joinedAt: '2023-01-15', gender: 'M', engagementLevel: 'leader', role: 'Ancien', isBaptized: true },
+        { id: '2', firstName: 'Marie', lastName: 'Nguessan', matricule: '7291048MN', email: 'marie.n@email.com', phone: '0505050505', churchId: '1', groups: ['Femmes'], status: 'active', joinedAt: '2023-03-20', gender: 'F', engagementLevel: 'active', isBaptized: true },
+        { id: '3', firstName: 'Kouassi', lastName: 'Bertin', matricule: '5820194KB', email: 'k.bertin@email.com', phone: '0101010101', churchId: 'default', groups: ['Jeunesse'], status: 'active', joinedAt: '2024-01-10', gender: 'M', engagementLevel: 'new', isBaptized: false },
+        { id: '4', firstName: 'Awa', lastName: 'Coulibaly', matricule: '9147382AC', email: 'awa.c@email.com', phone: '0808080808', churchId: '1', groups: ['Chorale'], status: 'active', joinedAt: '2024-02-05', gender: 'F', engagementLevel: 'leader', role: 'Maître de Chœur', isBaptized: true },
+        { id: '5', firstName: 'Paul', lastName: 'Yao', matricule: '6293847PY', email: 'paul.yao@email.com', phone: '0909090909', churchId: 'default', groups: ['Sécurité'], status: 'inactive', joinedAt: '2022-11-12', gender: 'M', engagementLevel: 'new', role: 'Diacre', isBaptized: true },
       ],
       children: [
         { 
-          id: '1', 
-          firstName: 'Jean', 
-          lastName: 'Koffi', 
-          matricule: '26-4827-0001-H',
+          id: '1',
+          firstName: 'Jean',
+          lastName: 'Koffi',
+          matricule: 'JK384729',
           birthDate: '2018-05-12', 
           gender: 'M', 
           parentId: '1', 
@@ -1532,10 +1532,10 @@ export const useStore = create<AppState>()(
           }
         },
         { 
-          id: '2', 
-          firstName: 'Marie', 
-          lastName: 'Nguessan', 
-          matricule: '26-4827-0002-F',
+          id: '2',
+          firstName: 'Marie',
+          lastName: 'Nguessan',
+          matricule: 'MN729104',
           birthDate: '2021-08-20', 
           gender: 'F', 
           parentId: '2', 
@@ -1895,7 +1895,7 @@ export const useStore = create<AppState>()(
           numPart = Math.floor(1000000 + Math.random() * 9000000).toString(); // 7 chiffres
         } while (existingMatricules.some(m => m?.startsWith(numPart)));
         const letterPart = `${member.firstName[0]}${member.lastName[0]}`.toUpperCase();
-        const matricule = `${numPart}-${letterPart}`;
+        const matricule = `${numPart}${letterPart}`;
 
         return {
           members: [...state.members, {
@@ -1919,8 +1919,8 @@ export const useStore = create<AppState>()(
         let numPart: string;
         do {
           numPart = Math.floor(100000 + Math.random() * 900000).toString(); // 6 chiffres
-        } while (existingIds.some(id => id === `${letterPart}-${numPart}`));
-        const matricule = `${letterPart}-${numPart}`;
+        } while (existingIds.some(id => id === `${letterPart}${numPart}`));
+        const matricule = `${letterPart}${numPart}`;
 
         return {
           children: [...state.children, {
