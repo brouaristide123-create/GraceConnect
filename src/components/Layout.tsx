@@ -1,14 +1,14 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useStore } from '../lib/store';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Wallet, 
-  Church as ChurchIcon, 
-  Calendar, 
-  Settings, 
-  Menu, 
+import {
+  LayoutDashboard,
+  Users,
+  Wallet,
+  Church as ChurchIcon,
+  Calendar,
+  Settings,
+  Menu,
   X,
   Bell,
   ChevronDown,
@@ -28,7 +28,8 @@ import {
   FileText,
   BarChart3,
   UserCog,
-  LogOut
+  LogOut,
+  Activity
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
@@ -47,7 +48,8 @@ interface LayoutProps {
 }
 
 const navItems = [
-  { name: 'Accueil', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Tableau de Bord', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Activités Récentes', href: '/activities', icon: Activity },
   { name: 'Églises', href: '/churches', icon: ChurchIcon },
   { 
     name: 'Organisation', 
@@ -94,6 +96,7 @@ const navItems = [
   { name: 'Documents', href: '/documents', icon: FileText },
   { name: 'Statistiques', href: '/stats', icon: BarChart3 },
   { name: 'Utilisateurs', href: '/users', icon: UserCog },
+  { name: 'Paramètres', href: '/settings', icon: Settings },
 ];
 
 export function Layout({ children }: LayoutProps) {
@@ -124,9 +127,9 @@ export function Layout({ children }: LayoutProps) {
   const filteredNavItems = React.useMemo(() => {
     if (!currentUser) return [];
     if (!currentUser.tabAccess) return navItems;
-    // Always include Accueil if not explicitly denied, or just check the list
-    return navItems.filter(item => 
-      item.name === 'Accueil' || 
+    // Always include Tableau de Bord if not explicitly denied, or just check the list
+    return navItems.filter(item =>
+      item.name === 'Tableau de Bord' ||
       currentUser.tabAccess?.includes(item.name)
     );
   }, [currentUser]);

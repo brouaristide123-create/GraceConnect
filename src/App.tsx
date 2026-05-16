@@ -47,6 +47,8 @@ import { SuperAdminValidationRequests } from './components/admin/SuperAdminValid
 import { SubscriptionManagement } from './components/admin/SubscriptionManagement';
 import { ChurchesPage } from './components/ChurchesPage';
 import { ListingsPage } from './components/ListingsPage';
+import { RecentActivitiesPage } from './components/RecentActivitiesPage';
+import { SettingsManagement } from './components/SettingsManagement';
 
 export default function App() {
   const { isAuthenticated, currentUser } = useStore();
@@ -131,8 +133,8 @@ export default function App() {
                     <Route path="/documents" element={<DocumentManagement />} />
                     <Route path="/stats" element={<StatisticsManagement />} />
                     <Route path="/users" element={<UserManagement />} />
-                    
-                    <Route path="/settings" element={<div className="p-8 text-center text-slate-500 italic">Paramètres en cours de développement...</div>} />
+                    <Route path="/activities" element={<RecentActivitiesPage />} />
+                    <Route path="/settings" element={<SettingsManagement />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
                   </Routes>
                 </Layout>

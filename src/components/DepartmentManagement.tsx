@@ -73,7 +73,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 const deptSchema = z.object({
   name: z.string().min(2, "Le nom est requis"),
-  type: z.enum(['ministry', 'department', 'group']),
+  type: z.enum(['ministry', 'department', 'group', 'other']),
   leaderId: z.string().min(1, "Le responsable est requis"),
   assistantIds: z.array(z.string()),
   leadershipIds: z.array(z.string()),
@@ -84,7 +84,7 @@ const deptSchema = z.object({
   meetingDays: z.array(z.string()).min(1, "Au moins un jour de réunion"),
   meetingTime: z.string().optional(),
   location: z.string().min(2, "Le lieu est requis"),
-  frequency: z.enum(['weekly', 'monthly', 'occasional']),
+  frequency: z.enum(['weekly', 'monthly', 'occasional', 'other']),
   color: z.string(),
   icon: z.string(),
   logoUrl: z.string().optional(),
@@ -156,6 +156,12 @@ export function DepartmentManagement() {
   const [statusFilter, setStatusFilter] = React.useState<'all' | 'active' | 'paused'>('all');
   const [isAddDeptOpen, setIsAddDeptOpen] = React.useState(false);
   const [currentStep, setCurrentStep] = React.useState(1);
+  const [typeOther, setTypeOther] = React.useState('');
+  const [leaderSearch, setLeaderSearch] = React.useState('');
+  const [assistantSearch, setAssistantSearch] = React.useState('');
+  const [leadershipSearch, setLeadershipSearch] = React.useState('');
+  const [memberSearch3, setMemberSearch3] = React.useState('');
+  const [frequencyOther, setFrequencyOther] = React.useState('');
 
   const selectedDept = departments.find(d => d.id === selectedDeptId);
 
@@ -371,7 +377,7 @@ export function DepartmentManagement() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-xs font-bold uppercase text-slate-500">Type</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Sélectionner" />
@@ -381,8 +387,17 @@ export function DepartmentManagement() {
                                     <SelectItem value="ministry">Ministère</SelectItem>
                                     <SelectItem value="department">Département</SelectItem>
                                     <SelectItem value="group">Groupe</SelectItem>
+                                    <SelectItem value="other">Autre</SelectItem>
                                   </SelectContent>
                                 </Select>
+                                {field.value === 'other' && (
+                                  <Input
+                                    className="mt-2"
+                                    placeholder="Précisez le type..."
+                                    value={typeOther}
+                                    onChange={(e) => setTypeOther(e.target.value)}
+                                  />
+                                )}
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -523,18 +538,40 @@ export function DepartmentManagement() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-xs font-bold uppercase text-slate-500">Responsable Principal *</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Choisir un responsable" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {members.map(m => (
-                                      <SelectItem key={m.id} value={m.id}>{m.firstName} {m.lastName}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                <FormControl>
+                                  <div className="space-y-2">
+                                    <Input
+                                      placeholder="Rechercher un membre..."
+                                      value={leaderSearch}
+                                      onChange={(e) => setLeaderSearch(e.target.value)}
+                                    />
+                                    <div className="max-h-[200px] overflow-y-auto border rounded-xl divide-y">
+                                      {members
+                                        .filter(m => `${m.firstName} ${m.lastName}`.toLowerCase().includes(leaderSearch.toLowerCase()))
+                                        .map(m => (
+                                          <div
+                                            key={m.id}
+                                            className={cn(
+                                              "flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-slate-50 transition-colors",
+                                              field.value === m.id ? "bg-church-gold/10" : ""
+                                            )}
+                                            onClick={() => field.onChange(m.id)}
+                                          >
+                                            <Avatar className="h-7 w-7">
+                                              <AvatarFallback className="text-[10px]">{m.firstName[0]}{m.lastName[0]}</AvatarFallback>
+                                            </Avatar>
+                                            <span className="text-sm">{m.firstName} {m.lastName}</span>
+                                            {field.value === m.id && <CheckCircle2 className="w-4 h-4 text-church-gold ml-auto" />}
+                                          </div>
+                                        ))}
+                                    </div>
+                                    {field.value && (
+                                      <p className="text-xs text-church-green font-medium">
+                                        Sélectionné : {members.find(m => m.id === field.value)?.firstName} {members.find(m => m.id === field.value)?.lastName}
+                                      </p>
+                                    )}
+                                  </div>
+                                </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -548,14 +585,20 @@ export function DepartmentManagement() {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-xs">Assistants</FormLabel>
+                                  <Input
+                                    className="h-8 text-xs mb-2"
+                                    placeholder="Rechercher..."
+                                    value={assistantSearch}
+                                    onChange={(e) => setAssistantSearch(e.target.value)}
+                                  />
                                   <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto pr-2">
-                                    {members.map(m => (
+                                    {members.filter(m => `${m.firstName} ${m.lastName}`.toLowerCase().includes(assistantSearch.toLowerCase())).slice(0, 10).map(m => (
                                       <div key={m.id} className="flex items-center space-x-2">
-                                        <Checkbox 
+                                        <Checkbox
                                           id={`assistant-${m.id}`}
                                           checked={field.value?.includes(m.id)}
                                           onCheckedChange={(checked) => {
-                                            const newVal = checked 
+                                            const newVal = checked
                                               ? [...(field.value || []), m.id]
                                               : field.value?.filter(id => id !== m.id);
                                             field.onChange(newVal);
@@ -577,14 +620,20 @@ export function DepartmentManagement() {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-xs">Équipe de direction</FormLabel>
+                                  <Input
+                                    className="h-8 text-xs mb-2"
+                                    placeholder="Rechercher..."
+                                    value={leadershipSearch}
+                                    onChange={(e) => setLeadershipSearch(e.target.value)}
+                                  />
                                   <div className="grid grid-cols-2 gap-2 max-h-[150px] overflow-y-auto pr-2">
-                                    {members.map(m => (
+                                    {members.filter(m => `${m.firstName} ${m.lastName}`.toLowerCase().includes(leadershipSearch.toLowerCase())).slice(0, 10).map(m => (
                                       <div key={m.id} className="flex items-center space-x-2">
-                                        <Checkbox 
+                                        <Checkbox
                                           id={`leadership-${m.id}`}
                                           checked={field.value?.includes(m.id)}
                                           onCheckedChange={(checked) => {
-                                            const newVal = checked 
+                                            const newVal = checked
                                               ? [...(field.value || []), m.id]
                                               : field.value?.filter(id => id !== m.id);
                                             field.onChange(newVal);
@@ -621,13 +670,18 @@ export function DepartmentManagement() {
                               Tout sélectionner
                             </Button>
                          </div>
+                         <Input
+                           placeholder="Rechercher un membre..."
+                           value={memberSearch3}
+                           onChange={(e) => setMemberSearch3(e.target.value)}
+                         />
                          <div className="p-1 border rounded-xl max-h-[350px] overflow-y-auto">
                             <FormField
                               control={deptForm.control}
                               name="initialMembers"
                               render={({ field }) => (
                                 <div className="space-y-1">
-                                  {members.map(m => (
+                                  {members.filter(m => `${m.firstName} ${m.lastName}`.toLowerCase().includes(memberSearch3.toLowerCase())).map(m => (
                                     <div 
                                       key={m.id} 
                                       className={cn(
@@ -740,7 +794,7 @@ export function DepartmentManagement() {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-xs font-bold uppercase text-slate-500">Fréquence</FormLabel>
-                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl>
                                       <SelectTrigger>
                                         <SelectValue placeholder="Sélectionner" />
@@ -750,8 +804,17 @@ export function DepartmentManagement() {
                                       <SelectItem value="weekly">Hebdomadaire</SelectItem>
                                       <SelectItem value="monthly">Mensuel</SelectItem>
                                       <SelectItem value="occasional">Occasionnel</SelectItem>
+                                      <SelectItem value="other">Autre</SelectItem>
                                     </SelectContent>
                                   </Select>
+                                  {field.value === 'other' && (
+                                    <Input
+                                      className="mt-2"
+                                      placeholder="Précisez la fréquence..."
+                                      value={frequencyOther}
+                                      onChange={(e) => setFrequencyOther(e.target.value)}
+                                    />
+                                  )}
                                 </FormItem>
                               )}
                             />
@@ -830,7 +893,7 @@ export function DepartmentManagement() {
                                   render={({ field }) => (
                                     <FormItem>
                                       <FormLabel className="text-xs">Qui peut voir ?</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                                         <SelectContent>
                                           <SelectItem value="all">Tout le monde</SelectItem>
@@ -846,7 +909,7 @@ export function DepartmentManagement() {
                                   render={({ field }) => (
                                     <FormItem>
                                       <FormLabel className="text-xs">Qui peut modifier ?</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                                         <SelectContent>
                                           <SelectItem value="admin">Administrateurs</SelectItem>

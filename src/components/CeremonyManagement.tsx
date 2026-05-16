@@ -797,32 +797,6 @@ export function CeremonyManagement() {
                   </div>
                 )}
 
-                <div className="flex justify-between items-center pt-8 border-t bg-white sticky bottom-0 z-10 pb-2">
-                  <Button variant="ghost" onClick={step === 1 ? resetForms : () => setStep(step - 1)}>
-                    {step === 1 ? 'Annuler' : (
-                      <>
-                        <ChevronLeft className="w-4 h-4 mr-2" /> Retour
-                      </>
-                    )}
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={handleCreateCeremony}>Enregistrer</Button>
-                    {step < 3 ? (
-                      <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => setStep(step + 1)}>
-                        Suivant <ChevronRight className="w-4 h-4 ml-2" />
-                      </Button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleCreateCeremony}>
-                           Valider le baptême
-                        </Button>
-                        <Button variant="outline" className="border-church-gold text-church-gold">
-                           Générer certificat
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="space-y-8 animate-in slide-in-from-right duration-300">
@@ -1230,35 +1204,46 @@ export function CeremonyManagement() {
                   </div>
                 )}
 
-                <div className="flex justify-between items-center pt-8 border-t bg-white sticky bottom-0 z-10 pb-2">
-                  <Button variant="ghost" onClick={step === 1 ? resetForms : () => setStep(step - 1)}>
-                    {step === 1 ? 'Annuler' : (
-                      <>
-                        <ChevronLeft className="w-4 h-4 mr-2" /> Retour
-                      </>
-                    )}
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={handleCreateCeremony}>Enregistrer</Button>
-                    {step < 4 ? (
-                      <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => setStep(step + 1)}>
-                        Suivant <ChevronRight className="w-4 h-4 ml-2" />
-                      </Button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleCreateCeremony}>
-                           Valider mariage
-                        </Button>
-                        <Button variant="outline" className="border-church-gold text-church-gold">
-                           Générer certificat
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             )}
           </div>
+
+          {/* Footer fixe — en dehors du conteneur scrollable */}
+          {ceremonyType !== 'none' && (
+            <div className="shrink-0 flex justify-between items-center px-6 py-4 border-t bg-white">
+              <Button variant="ghost" onClick={step === 1 ? resetForms : () => setStep(step - 1)}>
+                {step === 1 ? 'Annuler' : (
+                  <>
+                    <ChevronLeft className="w-4 h-4 mr-2" /> Retour
+                  </>
+                )}
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleCreateCeremony}>Enregistrer</Button>
+                {ceremonyType === 'baptism' ? (
+                  step < 3 ? (
+                    <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => setStep(step + 1)}>
+                      Suivant <ChevronRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  ) : (
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleCreateCeremony}>
+                      Valider le baptême
+                    </Button>
+                  )
+                ) : (
+                  step < 4 ? (
+                    <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => setStep(step + 1)}>
+                      Suivant <ChevronRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  ) : (
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleCreateCeremony}>
+                      Valider mariage
+                    </Button>
+                  )
+                )}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

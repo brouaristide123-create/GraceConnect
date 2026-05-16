@@ -327,8 +327,6 @@ export function UserManagement() {
         <TabsList className="bg-slate-100 p-1">
           <TabsTrigger value="list">Liste des Comptes</TabsTrigger>
           <TabsTrigger value="responsible">Responsable Église</TabsTrigger>
-          <TabsTrigger value="access">Accès</TabsTrigger>
-          <TabsTrigger value="audit">Journal d'Audit</TabsTrigger>
           <TabsTrigger value="roles">Rôles & Permissions</TabsTrigger>
         </TabsList>
 
@@ -451,119 +449,6 @@ export function UserManagement() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="access" className="space-y-6">
-          <Card className="border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Gestion des Accès</CardTitle>
-              <CardDescription>Configurez les modules accessibles pour chaque utilisateur.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-xl border border-slate-100 overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow>
-                      <TableHead>Utilisateur</TableHead>
-                      <TableHead className="text-center">Finances</TableHead>
-                      <TableHead className="text-center">Membres</TableHead>
-                      <TableHead className="text-center">Organisation</TableHead>
-                      <TableHead className="text-center">Formations</TableHead>
-                      <TableHead className="text-center">Événements</TableHead>
-                      <TableHead className="text-center">Stats</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>
-                          <div>
-                            <p className="text-sm font-bold text-slate-900">{user.firstName} {user.lastName}</p>
-                            <p className="text-xs text-slate-500">{user.position || 'Utilisateur'}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Checkbox 
-                            checked={user.tabAccess?.includes('Finances') ?? true}
-                            onCheckedChange={(checked) => {
-                              const current = user.tabAccess || ['Accueil', 'Églises', 'Organisation', 'Membres', 'Finances', 'Affectations', 'Formations', 'Communications', 'Documents', 'Statistiques', 'Utilisateurs'];
-                              const next = checked 
-                                ? [...current, 'Finances']
-                                : current.filter(t => t !== 'Finances');
-                              updateUser(user.id, { tabAccess: Array.from(new Set(next)) });
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Checkbox 
-                            checked={user.tabAccess?.includes('Membres') ?? true}
-                            onCheckedChange={(checked) => {
-                              const current = user.tabAccess || ['Accueil', 'Églises', 'Organisation', 'Membres', 'Finances', 'Affectations', 'Formations', 'Communications', 'Documents', 'Statistiques', 'Utilisateurs'];
-                              const next = checked 
-                                ? [...current, 'Membres']
-                                : current.filter(t => t !== 'Membres');
-                              updateUser(user.id, { tabAccess: Array.from(new Set(next)) });
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Checkbox 
-                            checked={user.tabAccess?.includes('Organisation') ?? true}
-                            onCheckedChange={(checked) => {
-                              const current = user.tabAccess || ['Accueil', 'Églises', 'Organisation', 'Membres', 'Finances', 'Affectations', 'Formations', 'Communications', 'Documents', 'Statistiques', 'Utilisateurs'];
-                              const next = checked 
-                                ? [...current, 'Organisation']
-                                : current.filter(t => t !== 'Organisation');
-                              updateUser(user.id, { tabAccess: Array.from(new Set(next)) });
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Checkbox 
-                            checked={user.tabAccess?.includes('Formations') ?? true}
-                            onCheckedChange={(checked) => {
-                              const current = user.tabAccess || ['Accueil', 'Églises', 'Organisation', 'Membres', 'Finances', 'Affectations', 'Formations', 'Communications', 'Documents', 'Statistiques', 'Utilisateurs'];
-                              const next = checked 
-                                ? [...current, 'Formations']
-                                : current.filter(t => t !== 'Formations');
-                              updateUser(user.id, { tabAccess: Array.from(new Set(next)) });
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Checkbox 
-                            checked={user.tabAccess?.includes('Organisation') ?? true}
-                            onCheckedChange={(checked) => {
-                              // We use Organisation for events too in this simple checkbox, 
-                              // or we can add a specific Event permission if needed.
-                              // For now let's keep it simple.
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Checkbox 
-                            checked={user.tabAccess?.includes('Statistiques') ?? true}
-                            onCheckedChange={(checked) => {
-                              const current = user.tabAccess || ['Accueil', 'Églises', 'Organisation', 'Membres', 'Finances', 'Affectations', 'Formations', 'Communications', 'Documents', 'Statistiques', 'Utilisateurs'];
-                              const next = checked 
-                                ? [...current, 'Statistiques']
-                                : current.filter(t => t !== 'Statistiques');
-                              updateUser(user.id, { tabAccess: Array.from(new Set(next)) });
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => toast.success("Permissions enregistrées")}>
-                            Enregistrer
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
         <TabsContent value="responsible" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {users.filter(u => u.role === 'responsible').map(user => (
@@ -614,38 +499,6 @@ export function UserManagement() {
               </div>
             )}
           </div>
-        </TabsContent>
-
-        <TabsContent value="audit" className="space-y-6">
-          <Card className="border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">Journal d'Audit</CardTitle>
-              <CardDescription>Historique complet des actions effectuées sur la plateforme.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {auditLogs.map((log) => (
-                  <div key={log.id} className="flex items-start gap-4 p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
-                    <div className="p-2 bg-slate-100 rounded-lg text-slate-600 mt-1">
-                      <History className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-bold text-slate-900">{log.userName}</p>
-                        <span className="text-[10px] text-slate-400">{format(parseISO(log.timestamp), 'dd/MM/yyyy HH:mm', { locale: fr })}</span>
-                      </div>
-                      <p className="text-sm text-slate-600">
-                        <span className="font-medium text-blue-600">{log.action}</span> sur <span className="font-medium">{log.target}</span>
-                      </p>
-                      {log.details && (
-                        <p className="text-xs text-slate-400 mt-1 italic">{log.details}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="roles" className="space-y-6">

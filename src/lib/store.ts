@@ -880,6 +880,30 @@ export interface ServiceFinance {
   notes?: string;
 }
 
+export interface CashRegister {
+  id: string;
+  name: string;
+  description?: string;
+  churchId: string;
+  linkedTo?: { type: 'event' | 'service' | 'general'; id?: string; name?: string };
+  balance: number;
+  createdAt: string;
+  isActive: boolean;
+}
+
+export interface CashTransaction {
+  id: string;
+  registerId: string;
+  type: 'income' | 'expense' | 'donation' | 'offering' | 'tithe' | 'transfer';
+  amount: number;
+  description: string;
+  category: string;
+  paymentMethod: 'Cash' | 'Mobile Money' | 'Bank' | 'Wave' | 'Djamo';
+  date: string;
+  authorId?: string;
+  notes?: string;
+}
+
 interface AppState {
   churches: Church[];
   members: Member[];
@@ -933,7 +957,9 @@ interface AppState {
   baptisms: Baptism[];
   weddings: Wedding[];
   eventOrders: EventOrder[];
-  
+  cashRegisters: CashRegister[];
+  cashTransactions: CashTransaction[];
+
   // Auth state
   isAuthenticated: boolean;
   currentUser: User | null;
@@ -1007,6 +1033,11 @@ interface AppState {
   
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
   addAttendance: (attendance: Omit<Attendance, 'id'>) => void;
+
+  addCashRegister: (register: Omit<CashRegister, 'id' | 'createdAt'>) => void;
+  updateCashRegister: (id: string, register: Partial<CashRegister>) => void;
+  deleteCashRegister: (id: string) => void;
+  addCashTransaction: (transaction: Omit<CashTransaction, 'id'>) => void;
 
   addChildCheckIn: (checkIn: Omit<ChildCheckIn, 'id'>) => void;
   updateChildCheckIn: (id: string, checkIn: Partial<ChildCheckIn>) => void;
@@ -1609,6 +1640,8 @@ export const useStore = create<AppState>()(
       ],
       eventTeams: [],
       eventOrders: [],
+      cashRegisters: [],
+      cashTransactions: [],
       transactions: [
         { id: '1', type: 'tithe', amount: 50000, category: 'Dîmes', churchId: '1', memberId: '1', date: '2026-04-05', paymentMethod: 'Cash' },
         { id: '2', type: 'offering', amount: 150000, category: 'Offrandes', churchId: '1', date: '2026-04-05', paymentMethod: 'Cash' },
@@ -1856,23 +1889,20 @@ export const useStore = create<AppState>()(
       }),
       
       addMember: (member) => set((state) => {
-        const church = state.churches.find(c => c.id === member.churchId);
-        const churchCode = church?.code || '0000';
-        const platformId = '26';
-        
-        // Count existing members for this church to generate sequence
-        const churchMembers = state.members.filter(m => m.churchId === member.churchId);
-        const sequence = (churchMembers.length + 1).toString().padStart(4, '0');
-        const letter = member.gender === 'M' ? 'H' : 'F';
-        
-        const matricule = `${platformId}-${churchCode}-${sequence}-${letter}`;
+        const existingMatricules = state.members.map(m => m.matricule).filter(Boolean);
+        let numPart: string;
+        do {
+          numPart = Math.floor(1000000 + Math.random() * 9000000).toString(); // 7 chiffres
+        } while (existingMatricules.some(m => m?.startsWith(numPart)));
+        const letterPart = `${member.firstName[0]}${member.lastName[0]}`.toUpperCase();
+        const matricule = `${numPart}-${letterPart}`;
 
         return {
-          members: [...state.members, { 
-            ...member, 
-            id: crypto.randomUUID(), 
+          members: [...state.members, {
+            ...member,
+            id: crypto.randomUUID(),
             matricule,
-            joinedAt: new Date().toISOString() 
+            joinedAt: new Date().toISOString()
           }]
         };
       }),
@@ -1884,26 +1914,20 @@ export const useStore = create<AppState>()(
       })),
 
       addChild: (child) => set((state) => {
-        const church = state.churches.find(c => c.id === child.churchId);
-        const churchCode = church?.code || '0000';
-        const platformId = '26';
-        
-        // Count existing children for this church to generate sequence
-        const churchChildren = state.children.filter(c => c.churchId === child.churchId);
-        // We can also combine with members count if we want unique IDs across both, 
-        // but usually they are separate or combined. 
-        // Let's keep it consistent with members sequence generation.
-        const sequence = (churchChildren.length + 1).toString().padStart(4, '0');
-        const letter = child.gender === 'M' ? 'H' : 'F';
-        
-        const matricule = `${platformId}-${churchCode}-${sequence}-${letter}`;
+        const existingIds = state.children.map(c => c.matricule).filter(Boolean);
+        const letterPart = `${child.firstName[0]}${child.lastName[0]}`.toUpperCase();
+        let numPart: string;
+        do {
+          numPart = Math.floor(100000 + Math.random() * 900000).toString(); // 6 chiffres
+        } while (existingIds.some(id => id === `${letterPart}-${numPart}`));
+        const matricule = `${letterPart}-${numPart}`;
 
         return {
-          children: [...state.children, { 
-            ...child, 
-            id: crypto.randomUUID(), 
+          children: [...state.children, {
+            ...child,
+            id: crypto.randomUUID(),
             matricule,
-            joinedAt: new Date().toISOString() 
+            joinedAt: new Date().toISOString()
           }]
         };
       }),
@@ -2041,6 +2065,26 @@ export const useStore = create<AppState>()(
       addAttendance: (attendance) => set((state) => ({
         attendance: [...state.attendance, { ...attendance, id: crypto.randomUUID() }]
       })),
+
+      addCashRegister: (register) => set((state) => ({
+        cashRegisters: [...state.cashRegisters, { ...register, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+      })),
+      updateCashRegister: (id, register) => set((state) => ({
+        cashRegisters: state.cashRegisters.map((r) => (r.id === id ? { ...r, ...register } : r))
+      })),
+      deleteCashRegister: (id) => set((state) => ({
+        cashRegisters: state.cashRegisters.filter((r) => r.id !== id)
+      })),
+      addCashTransaction: (transaction) => set((state) => {
+        const reg = state.cashRegisters.find(r => r.id === transaction.registerId);
+        const delta = (transaction.type === 'expense') ? -transaction.amount : transaction.amount;
+        return {
+          cashTransactions: [...state.cashTransactions, { ...transaction, id: crypto.randomUUID() }],
+          cashRegisters: reg
+            ? state.cashRegisters.map(r => r.id === transaction.registerId ? { ...r, balance: r.balance + delta } : r)
+            : state.cashRegisters
+        };
+      }),
 
       addChildCheckIn: (checkIn) => set((state) => ({
         childCheckIns: [...state.childCheckIns, { ...checkIn, id: crypto.randomUUID() }]

@@ -1945,7 +1945,15 @@ export function TrainingManagement() {
 
   const selectedCourse = courses.find(c => c.id === selectedCourseId);
 
-  if (selectedCourse) {
+  if (selectedCourseId) {
+    if (!selectedCourse) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <p className="text-slate-500">Formation introuvable.</p>
+          <Button onClick={() => setSelectedCourseId(null)}>Retour aux formations</Button>
+        </div>
+      );
+    }
     return <CourseDetail course={selectedCourse} onClose={() => setSelectedCourseId(null)} />;
   }
 

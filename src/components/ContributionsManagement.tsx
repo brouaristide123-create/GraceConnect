@@ -626,10 +626,6 @@ export function ContributionsManagement() {
             <TrendingUp className="w-3.5 h-3.5 mr-2" />
             Statistiques & Analyse
           </TabsTrigger>
-          <TabsTrigger value="settings" className="data-[state=active]:bg-white text-xs">
-            <Shield className="w-3.5 h-3.5 mr-2" />
-            Gestion des Accès
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="history">
@@ -733,39 +729,6 @@ export function ContributionsManagement() {
           </div>
         </TabsContent>
 
-        <TabsContent value="settings">
-          <Card className="border-none shadow-md">
-            <CardHeader>
-              <CardTitle className="text-base">Permissions & Accès</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-rose-50 rounded-lg text-rose-600">
-                    <Shield className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">Trésorier Principal</p>
-                    <p className="text-xs text-slate-500">Accès total aux finances</p>
-                  </div>
-                </div>
-                <Badge>Admin</Badge>
-              </div>
-              <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">Responsables de Groupes</p>
-                    <p className="text-xs text-slate-500">Lecture seule des cotisations de leur groupe</p>
-                  </div>
-                </div>
-                <Badge variant="secondary">Lecture</Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* Automatic Mode Feature */}

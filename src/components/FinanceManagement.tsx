@@ -1,9 +1,9 @@
 import React from 'react';
 import { 
-  Wallet, 
-  Plus, 
-  ArrowUpRight, 
-  ArrowDownRight, 
+  Wallet,
+  Plus,
+  ArrowUpRight,
+  ArrowDownRight,
   Download,
   Filter,
   Search,
@@ -23,7 +23,9 @@ import {
   Eye,
   UserCog,
   ArrowRight,
-  CheckCircle2
+  CheckCircle2,
+  Archive,
+  Trash2
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -70,7 +72,7 @@ import {
 import { Badge } from './ui/badge';
 import { Switch } from './ui/switch';
 import { ScrollArea, ScrollBar } from './ui/scroll-area';
-import { useStore, Transaction } from '../lib/store';
+import { useStore, Transaction, CashRegister, CashTransaction } from '../lib/store';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -101,8 +103,13 @@ const transactionSchema = z.object({
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 
 export function FinanceManagement() {
-  const { transactions, churches, members, addTransaction } = useStore();
+  const { transactions, churches, members, addTransaction, cashRegisters, cashTransactions, addCashRegister, updateCashRegister, deleteCashRegister, addCashTransaction, currentUser, events, services } = useStore();
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
+  const [isAddCaisseOpen, setIsAddCaisseOpen] = React.useState(false);
+  const [isCaisseTransactionOpen, setIsCaisseTransactionOpen] = React.useState(false);
+  const [selectedCaisseId, setSelectedCaisseId] = React.useState<string | null>(null);
+  const [caisseForm, setCaisseForm] = React.useState({ name: '', description: '', linkedType: 'general' as 'general' | 'event' | 'service', linkedId: '' });
+  const [txForm, setTxForm] = React.useState({ type: 'income' as CashTransaction['type'], amount: '', description: '', category: '', paymentMethod: 'Cash' as CashTransaction['paymentMethod'], notes: '' });
   const [isAISummaryEnabled, setIsAISummaryEnabled] = React.useState(true);
   const [showSummaryConfirm, setShowSummaryConfirm] = React.useState(false);
   const [pendingAIToggle, setPendingAIToggle] = React.useState(false);
@@ -756,6 +763,10 @@ export function FinanceManagement() {
             <Shield className="w-4 h-4 mr-2" />
             Sécurité & Accès
           </TabsTrigger>
+          <TabsTrigger value="caisses" className="data-[state=active]:bg-white">
+            <Archive className="w-4 h-4 mr-2" />
+            Caisses
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="transactions" className="space-y-6">
@@ -982,6 +993,247 @@ export function FinanceManagement() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── CAISSES ── */}
+        <TabsContent value="caisses" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Gestion des Caisses</h3>
+              <p className="text-slate-500 text-sm">Gérez les caisses de votre église avec leur solde en temps réel.</p>
+            </div>
+            <Button
+              className="bg-church-gold hover:bg-church-gold/90 text-white"
+              onClick={() => setIsAddCaisseOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Créer une caisse
+            </Button>
+          </div>
+
+          {cashRegisters.filter(r => r.churchId === (currentUser?.churchId || churches[0]?.id)).length === 0 ? (
+            <div className="py-16 text-center bg-white rounded-2xl border-2 border-dashed border-slate-200">
+              <Archive className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-600">Aucune caisse créée</h3>
+              <p className="text-slate-400 text-sm">Créez votre première caisse pour commencer à gérer les fonds.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {cashRegisters.filter(r => r.churchId === (currentUser?.churchId || churches[0]?.id)).map(reg => {
+                const regTxs = cashTransactions.filter(t => t.registerId === reg.id);
+                return (
+                  <Card key={reg.id} className="border-none shadow-sm hover:shadow-md transition-all">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle className="text-base">{reg.name}</CardTitle>
+                          {reg.description && <CardDescription className="text-xs mt-1">{reg.description}</CardDescription>}
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-400 hover:text-rose-600" onClick={() => deleteCashRegister(reg.id)}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-500">Solde actuel</span>
+                        <span className={cn("text-xl font-bold", reg.balance >= 0 ? "text-emerald-600" : "text-rose-600")}>
+                          {reg.balance.toLocaleString('fr-FR')} FCFA
+                        </span>
+                      </div>
+                      {reg.linkedTo && (
+                        <Badge className="bg-slate-100 text-slate-600 border-none text-xs">
+                          {reg.linkedTo.type === 'event' ? 'Événement' : reg.linkedTo.type === 'service' ? 'Culte' : 'Général'}
+                          {reg.linkedTo.name ? ` : ${reg.linkedTo.name}` : ''}
+                        </Badge>
+                      )}
+                      <p className="text-xs text-slate-400">{regTxs.length} transaction(s)</p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8"
+                          onClick={() => { setSelectedCaisseId(reg.id); setTxForm(f => ({...f, type: 'income'})); setIsCaisseTransactionOpen(true); }}
+                        >
+                          + Entrée
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 text-xs h-8"
+                          onClick={() => { setSelectedCaisseId(reg.id); setTxForm(f => ({...f, type: 'expense'})); setIsCaisseTransactionOpen(true); }}
+                        >
+                          - Dépense
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-8"
+                          onClick={() => { setSelectedCaisseId(reg.id); setTxForm(f => ({...f, type: 'donation'})); setIsCaisseTransactionOpen(true); }}
+                        >
+                          Don
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Dialog: Créer caisse */}
+          <Dialog open={isAddCaisseOpen} onOpenChange={setIsAddCaisseOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Créer une caisse</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase text-slate-500">Nom *</label>
+                  <Input placeholder="ex: Caisse Principale, Caisse Concert..." value={caisseForm.name} onChange={e => setCaisseForm(f => ({...f, name: e.target.value}))} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase text-slate-500">Description</label>
+                  <Input placeholder="Description optionnelle..." value={caisseForm.description} onChange={e => setCaisseForm(f => ({...f, description: e.target.value}))} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase text-slate-500">Liée à</label>
+                  <Select value={caisseForm.linkedType} onValueChange={(v: any) => setCaisseForm(f => ({...f, linkedType: v, linkedId: ''}))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">Général</SelectItem>
+                      <SelectItem value="event">Événement</SelectItem>
+                      <SelectItem value="service">Culte</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {caisseForm.linkedType === 'event' && (
+                    <Select value={caisseForm.linkedId} onValueChange={v => setCaisseForm(f => ({...f, linkedId: v}))}>
+                      <SelectTrigger><SelectValue placeholder="Choisir un événement" /></SelectTrigger>
+                      <SelectContent>
+                        {events.filter(e => e.churchId === (currentUser?.churchId || churches[0]?.id)).map(e => (
+                          <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {caisseForm.linkedType === 'service' && (
+                    <Select value={caisseForm.linkedId} onValueChange={v => setCaisseForm(f => ({...f, linkedId: v}))}>
+                      <SelectTrigger><SelectValue placeholder="Choisir un culte" /></SelectTrigger>
+                      <SelectContent>
+                        {services.filter(s => s.churchId === (currentUser?.churchId || churches[0]?.id)).map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.theme || s.date}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddCaisseOpen(false)}>Annuler</Button>
+                <Button
+                  className="bg-church-gold hover:bg-church-gold/90 text-white"
+                  onClick={() => {
+                    if (!caisseForm.name.trim()) { toast.error("Le nom est requis"); return; }
+                    const linkedItem = caisseForm.linkedType !== 'general'
+                      ? (caisseForm.linkedType === 'event'
+                          ? events.find(e => e.id === caisseForm.linkedId)
+                          : services.find(s => s.id === caisseForm.linkedId))
+                      : undefined;
+                    addCashRegister({
+                      name: caisseForm.name,
+                      description: caisseForm.description,
+                      churchId: currentUser?.churchId || churches[0]?.id || '',
+                      balance: 0,
+                      isActive: true,
+                      linkedTo: caisseForm.linkedType !== 'general' ? {
+                        type: caisseForm.linkedType,
+                        id: caisseForm.linkedId || undefined,
+                        name: linkedItem && 'name' in linkedItem ? linkedItem.name : linkedItem && 'theme' in linkedItem ? linkedItem.theme : undefined
+                      } : undefined,
+                    });
+                    setCaisseForm({ name: '', description: '', linkedType: 'general', linkedId: '' });
+                    setIsAddCaisseOpen(false);
+                    toast.success("Caisse créée avec succès");
+                  }}
+                >
+                  Créer
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog: Transaction */}
+          <Dialog open={isCaisseTransactionOpen} onOpenChange={setIsCaisseTransactionOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Nouvelle transaction</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase text-slate-500">Type</label>
+                  <Select value={txForm.type} onValueChange={(v: any) => setTxForm(f => ({...f, type: v}))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="income">Entrée</SelectItem>
+                      <SelectItem value="expense">Dépense</SelectItem>
+                      <SelectItem value="donation">Don</SelectItem>
+                      <SelectItem value="offering">Offrande</SelectItem>
+                      <SelectItem value="tithe">Dîme</SelectItem>
+                      <SelectItem value="transfer">Virement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase text-slate-500">Montant (FCFA) *</label>
+                  <Input type="number" min="0" placeholder="0" value={txForm.amount} onChange={e => setTxForm(f => ({...f, amount: e.target.value}))} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase text-slate-500">Description *</label>
+                  <Input placeholder="Description..." value={txForm.description} onChange={e => setTxForm(f => ({...f, description: e.target.value}))} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase text-slate-500">Catégorie</label>
+                  <Input placeholder="ex: Quête, Frais, Dîme..." value={txForm.category} onChange={e => setTxForm(f => ({...f, category: e.target.value}))} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase text-slate-500">Méthode de paiement</label>
+                  <Select value={txForm.paymentMethod} onValueChange={(v: any) => setTxForm(f => ({...f, paymentMethod: v}))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Mobile Money">Mobile Money</SelectItem>
+                      <SelectItem value="Bank">Virement bancaire</SelectItem>
+                      <SelectItem value="Wave">Wave</SelectItem>
+                      <SelectItem value="Djamo">Djamo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCaisseTransactionOpen(false)}>Annuler</Button>
+                <Button
+                  className="bg-church-gold hover:bg-church-gold/90 text-white"
+                  onClick={() => {
+                    if (!txForm.amount || !txForm.description) { toast.error("Montant et description requis"); return; }
+                    addCashTransaction({
+                      registerId: selectedCaisseId!,
+                      type: txForm.type,
+                      amount: parseFloat(txForm.amount),
+                      description: txForm.description,
+                      category: txForm.category || txForm.type,
+                      paymentMethod: txForm.paymentMethod,
+                      date: new Date().toISOString(),
+                      notes: txForm.notes,
+                    });
+                    setTxForm({ type: 'income', amount: '', description: '', category: '', paymentMethod: 'Cash', notes: '' });
+                    setIsCaisseTransactionOpen(false);
+                    toast.success("Transaction enregistrée");
+                  }}
+                >
+                  Enregistrer
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
 

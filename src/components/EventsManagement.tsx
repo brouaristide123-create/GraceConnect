@@ -77,7 +77,7 @@ const eventSchema = z.object({
   endDate: z.string().min(1, "La date de fin est requise"),
   location: z.string().min(2, "Le lieu est requis"),
   description: z.string().min(10, "La description doit être plus longue"),
-  organizerId: z.string().min(1, "L'organisateur est requis"),
+  organizerId: z.string().optional(),
   capacityLimit: z.number().optional(),
   isPaid: z.boolean(),
   price: z.number().optional(),
@@ -122,6 +122,7 @@ export function EventsManagement() {
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
   const [isAddEventOpen, setIsAddEventOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [hasDeptOrganizer, setHasDeptOrganizer] = React.useState(false);
 
   const eventForm = useForm<EventFormValues>({
     resolver: zodResolver(eventSchema),
@@ -281,28 +282,43 @@ export function EventsManagement() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={eventForm.control}
-                  name="organizerId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Organisateur (Département)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Choisir un département" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {departments.map(d => (
-                            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormItem>
+                  <FormLabel className="text-xs font-bold uppercase text-slate-500">Organisateur — Un département ?</FormLabel>
+                  <div className="flex gap-3 mt-2">
+                    <Button type="button" size="sm"
+                      className={hasDeptOrganizer ? "bg-church-green text-white" : "bg-slate-100 text-slate-600"}
+                      onClick={() => { setHasDeptOrganizer(true); }}
+                    >Oui</Button>
+                    <Button type="button" size="sm"
+                      className={!hasDeptOrganizer ? "bg-church-gold text-white" : "bg-slate-100 text-slate-600"}
+                      onClick={() => { setHasDeptOrganizer(false); eventForm.setValue('organizerId', ''); }}
+                    >Non (l'Église elle-même)</Button>
+                  </div>
+                </FormItem>
+                {hasDeptOrganizer && (
+                  <FormField
+                    control={eventForm.control}
+                    name="organizerId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Département organisateur</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Choisir un département" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {departments.map(d => (
+                              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 <FormField
                   control={eventForm.control}
                   name="description"
@@ -792,6 +808,7 @@ function EventDetail({ event, onBack }: { event: Event, onBack: () => void }) {
   const [activeTab, setActiveTab] = React.useState('infos');
   const [isEditOpen, setIsEditOpen] = React.useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = React.useState(false);
+  const [hasDeptOrganizerEdit, setHasDeptOrganizerEdit] = React.useState(!!event.organizerId);
   const [isAddTeamOpen, setIsAddTeamOpen] = React.useState(false);
   const [selectedTeam, setSelectedTeam] = React.useState<EventTeam | null>(null);
   const [isManageTeamOpen, setIsManageTeamOpen] = React.useState(false);
@@ -2183,28 +2200,43 @@ function EventDetail({ event, onBack }: { event: Event, onBack: () => void }) {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={editForm.control}
-                name="organizerId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Organisateur (Département)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choisir un département" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {departments.map(d => (
-                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <FormItem>
+                <FormLabel className="text-xs font-bold uppercase text-slate-500">Organisateur — Un département ?</FormLabel>
+                <div className="flex gap-3 mt-2">
+                  <Button type="button" size="sm"
+                    className={hasDeptOrganizerEdit ? "bg-church-green text-white" : "bg-slate-100 text-slate-600"}
+                    onClick={() => { setHasDeptOrganizerEdit(true); }}
+                  >Oui</Button>
+                  <Button type="button" size="sm"
+                    className={!hasDeptOrganizerEdit ? "bg-church-gold text-white" : "bg-slate-100 text-slate-600"}
+                    onClick={() => { setHasDeptOrganizerEdit(false); editForm.setValue('organizerId', ''); }}
+                  >Non (l'Église elle-même)</Button>
+                </div>
+              </FormItem>
+              {hasDeptOrganizerEdit && (
+                <FormField
+                  control={editForm.control}
+                  name="organizerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Département organisateur</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choisir un département" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {departments.map(d => (
+                            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <FormField
                 control={editForm.control}
                 name="description"
