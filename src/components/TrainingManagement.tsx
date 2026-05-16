@@ -1,4 +1,46 @@
 import React from 'react';
+
+// ── Error Boundary pour CourseDetail ──────────────────────────────────────────
+class CourseDetailErrorBoundary extends React.Component<
+  { children: React.ReactNode; onReset: () => void },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; onReset: () => void }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[CourseDetail Error]', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-96 gap-4 text-center p-8">
+          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+            <span className="text-3xl">⚠️</span>
+          </div>
+          <div>
+            <p className="text-lg font-semibold text-slate-700">Erreur d'affichage de la formation</p>
+            <p className="text-sm text-slate-500 mt-1">Un problème technique est survenu. Veuillez réessayer.</p>
+            {this.state.error && (
+              <p className="text-xs text-red-400 mt-2 font-mono">{this.state.error.message}</p>
+            )}
+          </div>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: null }); this.props.onReset(); }}
+            className="px-4 py-2 bg-church-gold text-white rounded-lg text-sm font-medium hover:opacity-90"
+          >
+            Retour aux formations
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { 
   GraduationCap, 
   Plus, 
@@ -195,11 +237,12 @@ function CourseDetail({ course, onClose }: { course: Course; onClose: () => void
   const [showGradesSheet, setShowGradesSheet] = React.useState(false);
   const [showCertificates, setShowCertificates] = React.useState(false);
 
-  const modules = courseModules.filter(m => m.courseId === course.id).sort((a, b) => a.order - b.order);
-  const enrollments = courseEnrollments.filter(e => e.courseId === course.id);
-  const resources = courseResources.filter(r => r.courseId === course.id);
-  const subjects = courseSubjects.filter(s => s.courseId === course.id);
-  const quizzes = courseQuizzes.filter(q => q.courseId === course.id);
+  // Gardes défensives — évite les crashs si des tableaux sont undefined en état persisté
+  const modules = (courseModules || []).filter(m => m.courseId === course.id).sort((a, b) => a.order - b.order);
+  const enrollments = (courseEnrollments || []).filter(e => e.courseId === course.id);
+  const resources = (courseResources || []).filter(r => r.courseId === course.id);
+  const subjects = (courseSubjects || []).filter(s => s.courseId === course.id);
+  const quizzes = (courseQuizzes || []).filter(q => q.courseId === course.id);
   const instructor = members.find(m => m.id === course.instructorId);
 
   const moduleForm = useForm<ModuleFormValues>({
@@ -747,7 +790,7 @@ function CourseDetail({ course, onClose }: { course: Course; onClose: () => void
                       const member = members.find(m => m.id === enrollment.memberId);
                       if (!member) return null;
 
-                      const studentGrades = courseGrades.filter(g => g.enrollmentId === enrollment.id);
+                      const studentGrades = (courseGrades || []).filter(g => g.enrollmentId === enrollment.id);
                       const average = studentGrades.length > 0
                         ? studentGrades.reduce((acc, g) => {
                             const subject = subjects.find(s => s.id === g.subjectId);
@@ -1362,7 +1405,7 @@ function CourseDetail({ course, onClose }: { course: Course; onClose: () => void
                   <tbody>
                     {subjects.map(subject => {
                       const enrollment = enrollments.find(e => e.id === selectedEnrollmentForBulletin);
-                      const grade = courseGrades.find(g => g.enrollmentId === enrollment?.id && g.subjectId === subject.id);
+                      const grade = (courseGrades || []).find(g => g.enrollmentId === enrollment?.id && g.subjectId === subject.id);
                       return (
                         <tr key={subject.id}>
                           <td className="border border-slate-900 p-3 text-sm font-bold">{subject.name}</td>
@@ -1667,7 +1710,7 @@ function GradesSheetView({
               <tbody className="divide-y divide-slate-200">
                 {enrollments.map((enrollment, idx) => {
                   const member = members.find(m => m.id === enrollment.memberId);
-                  const studentGrades = courseGrades.filter(g => g.enrollmentId === enrollment.id);
+                  const studentGrades = (courseGrades || []).filter(g => g.enrollmentId === enrollment.id);
                   
                   const totalCoeff = studentGrades.reduce((acc, g) => {
                     const s = subjects.find(sub => sub.id === g.subjectId);
@@ -1763,7 +1806,7 @@ function CertificatesView({
   onBack: () => void;
 }) {
   const passingEnrollments = enrollments.filter(enrollment => {
-    const studentGrades = courseGrades.filter(g => g.enrollmentId === enrollment.id);
+    const studentGrades = (courseGrades || []).filter(g => g.enrollmentId === enrollment.id);
     const totalCoeff = studentGrades.reduce((acc, g) => {
       const s = subjects.find(sub => sub.id === g.subjectId);
       return acc + (s?.coefficient || 1);
@@ -1943,18 +1986,27 @@ export function TrainingManagement() {
     toast.success("Formation créée avec succès");
   };
 
-  const selectedCourse = courses.find(c => c.id === selectedCourseId);
+  const selectedCourse = (courses || []).find(c => c.id === selectedCourseId);
 
   if (selectedCourseId) {
     if (!selectedCourse) {
       return (
         <div className="flex flex-col items-center justify-center h-64 gap-4">
-          <p className="text-slate-500">Formation introuvable.</p>
-          <Button onClick={() => setSelectedCourseId(null)}>Retour aux formations</Button>
+          <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center">
+            <GraduationCap className="w-8 h-8 text-slate-400" />
+          </div>
+          <p className="text-slate-500 font-medium">Formation introuvable.</p>
+          <Button onClick={() => setSelectedCourseId(null)} className="bg-church-gold text-white hover:bg-church-gold/90">
+            Retour aux formations
+          </Button>
         </div>
       );
     }
-    return <CourseDetail course={selectedCourse} onClose={() => setSelectedCourseId(null)} />;
+    return (
+      <CourseDetailErrorBoundary onReset={() => setSelectedCourseId(null)}>
+        <CourseDetail course={selectedCourse} onClose={() => setSelectedCourseId(null)} />
+      </CourseDetailErrorBoundary>
+    );
   }
 
   return (
