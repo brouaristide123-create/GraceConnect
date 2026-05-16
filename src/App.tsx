@@ -50,6 +50,7 @@ import { ListingsPage } from './components/ListingsPage';
 import { RecentActivitiesPage } from './components/RecentActivitiesPage';
 import { SettingsManagement } from './components/SettingsManagement';
 import { SuiviSpirituelManagement } from './components/SuiviSpirituelManagement';
+import { CashRegistersManagement } from './components/CashRegistersManagement';
 
 export default function App() {
   const { isAuthenticated, currentUser } = useStore();
@@ -125,7 +126,7 @@ export default function App() {
                     <Route path="/finances/contributions" element={<ContributionsManagement />} />
                     <Route path="/finances/funeral-fund" element={<FuneralManagement />} />
                     <Route path="/finances/projects" element={<ProjectManagement />} />
-                    <Route path="/finances/cash-registers" element={<FinanceManagement />} />
+                    <Route path="/finances/cash-registers" element={<CashRegistersManagement />} />
                     
                     {/* Autres sections */}
                     <Route path="/assignments" element={<AssignmentManagement />} />

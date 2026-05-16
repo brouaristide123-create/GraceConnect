@@ -1,5 +1,4 @@
 import React from 'react';
-import { useLocation } from 'react-router-dom';
 import { 
   Wallet,
   Plus,
@@ -104,7 +103,6 @@ const transactionSchema = z.object({
 type TransactionFormValues = z.infer<typeof transactionSchema>;
 
 export function FinanceManagement() {
-  const location = useLocation();
   const { transactions, churches, members, addTransaction, cashRegisters, cashTransactions, addCashRegister, updateCashRegister, deleteCashRegister, addCashTransaction, currentUser, events, services } = useStore();
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [isAddCaisseOpen, setIsAddCaisseOpen] = React.useState(false);
@@ -747,7 +745,7 @@ export function FinanceManagement() {
       </div>
 
       {/* Tabs for detailed management */}
-      <Tabs defaultValue={location.pathname === '/finances/cash-registers' ? 'caisses' : 'transactions'} className="space-y-6">
+      <Tabs defaultValue="transactions" className="space-y-6">
         <TabsList className="bg-slate-100 p-1">
           <TabsTrigger value="transactions" className="data-[state=active]:bg-white">
             <History className="w-4 h-4 mr-2" />
