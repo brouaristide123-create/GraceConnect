@@ -1256,6 +1256,11 @@ export interface AuditLog {
   timestamp: string;
 }
 
+// Suppression automatique des anciens caches localStorage
+(['ekklesia-africa-storage-v3', 'ekklesia-africa-storage-v4', 'ekklesia-africa-storage-v2', 'ekklesia-africa-storage-v1', 'ekklesia-africa-storage']).forEach(key => {
+  try { localStorage.removeItem(key); } catch {}
+});
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
