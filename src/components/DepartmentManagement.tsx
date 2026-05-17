@@ -124,8 +124,9 @@ const activitySchema = z.object({
 });
 
 const memberSchema = z.object({
-  memberId: z.string().min(1, "Le membre est requis"),
-  role: z.enum(['leader', 'assistant', 'member']),
+  memberIds: z.array(z.string()).min(1, "Choisissez au moins un membre"),
+  role: z.string().min(1, "Le rôle est requis"),
+  customRole: z.string().optional(),
 });
 
 const goalSchema = z.object({
@@ -1194,6 +1195,12 @@ function DepartmentDetail({ dept, onBack }: { dept: Department, onBack: () => vo
   const [selectedActForAttendance, setSelectedActForAttendance] = React.useState<DepartmentActivity | null>(null);
   const [attendanceList, setAttendanceList] = React.useState<string[]>([]);
   const [isEditDeptOpen, setIsEditDeptOpen] = React.useState(false);
+  // Multi-select member picker state
+  const [memberPickerSearch, setMemberPickerSearch] = React.useState('');
+  const [selectedMemberIds, setSelectedMemberIds] = React.useState<string[]>([]);
+  // Role "Autre" state
+  const [memberRole, setMemberRole] = React.useState<string>('member');
+  const [customMemberRole, setCustomMemberRole] = React.useState('');
 
   const editDeptForm = useForm<z.infer<typeof deptSchema>>({
     resolver: zodResolver(deptSchema),
@@ -1233,7 +1240,7 @@ function DepartmentDetail({ dept, onBack }: { dept: Department, onBack: () => vo
 
   const memberForm = useForm<z.infer<typeof memberSchema>>({
     resolver: zodResolver(memberSchema),
-    defaultValues: { memberId: '', role: 'member' }
+    defaultValues: { memberIds: [], role: 'member', customRole: '' }
   });
 
   const activityForm = useForm<z.infer<typeof activitySchema>>({
@@ -1254,11 +1261,21 @@ function DepartmentDetail({ dept, onBack }: { dept: Department, onBack: () => vo
     defaultValues: { title: '', target: 1, month: format(new Date(), 'MMMM yyyy', { locale: fr }) }
   });
 
-  const onAddMember = (values: z.infer<typeof memberSchema>) => {
-    addDeptMember({ ...values, departmentId: dept.id, status: 'active' });
+  const onAddMember = () => {
+    if (selectedMemberIds.length === 0) {
+      toast.error("Sélectionnez au moins un membre");
+      return;
+    }
+    const finalRole = memberRole === 'autre' ? (customMemberRole || 'Autre') : memberRole;
+    selectedMemberIds.forEach(memberId => {
+      addDeptMember({ memberId, role: finalRole as any, departmentId: dept.id, status: 'active' });
+    });
     setIsAddMemberOpen(false);
-    memberForm.reset();
-    toast.success("Membre ajouté au département");
+    setSelectedMemberIds([]);
+    setMemberPickerSearch('');
+    setMemberRole('member');
+    setCustomMemberRole('');
+    toast.success(`${selectedMemberIds.length} membre(s) ajouté(s) au département`);
   };
 
   const onAddActivity = (values: z.infer<typeof activitySchema>) => {
@@ -1518,90 +1535,156 @@ function DepartmentDetail({ dept, onBack }: { dept: Department, onBack: () => vo
                     <UserPlus className="w-4 h-4 mr-2" /> Ajouter un Membre
                   </Button>}>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[500px]">
+                  <DialogContent className="sm:max-w-[520px]">
                     <DialogHeader className="space-y-2">
                       <DialogTitle className="text-2xl font-serif font-bold text-slate-900">Intégrer un nouveau membre</DialogTitle>
                       <DialogDescription>
                         Rejoignez un membre de l'église au département <span className="font-bold text-church-gold">{dept.name}</span>.
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="py-6">
-                      <Form {...memberForm}>
-                        <form onSubmit={memberForm.handleSubmit(onAddMember)} className="space-y-6">
-                          <FormField
-                            control={memberForm.control}
-                            name="memberId"
-                            render={({ field }) => (
-                              <FormItem className="space-y-3">
-                                <FormLabel className="text-sm font-semibold text-slate-700">Membre de l'église</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-12 border-slate-200 focus:ring-church-gold/20">
-                                      <SelectValue placeholder="Choisir un membre dans la liste..." />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent className="max-h-[300px]">
-                                    {members.filter(m => !deptMems.some(dm => dm.memberId === m.id)).map(m => (
-                                      <SelectItem key={m.id} value={m.id} className="py-3">
-                                        <div className="flex items-center gap-3">
-                                          <Avatar className="w-8 h-8">
-                                            <AvatarFallback className="bg-church-gold/10 text-church-gold text-[10px]">
-                                              {m.firstName[0]}{m.lastName[0]}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                          <div className="flex flex-col text-left">
-                                            <span className="font-medium text-slate-900">{m.firstName} {m.lastName}</span>
-                                            <span className="text-[10px] text-slate-500">{m.phone}</span>
-                                          </div>
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
+                    <div className="py-4 space-y-5">
+                      {/* Multi-select member picker */}
+                      <div className="space-y-3">
+                        <label className="text-sm font-semibold text-slate-700">Membre(s) de l'église</label>
+                        {/* Search input */}
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <Input
+                            className="pl-9 h-10 border-slate-200"
+                            placeholder="Rechercher un membre..."
+                            value={memberPickerSearch}
+                            onChange={e => setMemberPickerSearch(e.target.value)}
                           />
-                          <FormField
-                            control={memberForm.control}
-                            name="role"
-                            render={({ field }) => (
-                              <FormItem className="space-y-3">
-                                <FormLabel className="text-sm font-semibold text-slate-700">Rôle / Fonction</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-12 border-slate-200 focus:ring-church-gold/20">
-                                      <SelectValue placeholder="Attribute un rôle..." />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="member" className="py-3">Membre actif</SelectItem>
-                                    <SelectItem value="assistant" className="py-3">Assistant / Adjoint</SelectItem>
-                                    <SelectItem value="leader" className="py-3">Responsable de pôle</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <div className="flex gap-3 pt-4">
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              className="flex-1 h-11"
-                              onClick={() => setIsAddMemberOpen(false)}
-                            >
-                              Annuler
-                            </Button>
-                            <Button 
-                              type="submit" 
-                              className="flex-1 h-11 bg-church-green hover:bg-church-green/90 text-white font-bold"
-                            >
-                              Confirmer l'ajout
-                            </Button>
+                        </div>
+                        {/* Toggle all */}
+                        {(() => {
+                          const availableMembers = members.filter(m => !deptMems.some(dm => dm.memberId === m.id));
+                          const filtered = availableMembers.filter(m =>
+                            `${m.firstName} ${m.lastName}`.toLowerCase().includes(memberPickerSearch.toLowerCase())
+                          );
+                          const allSelected = filtered.length > 0 && filtered.every(m => selectedMemberIds.includes(m.id));
+                          return (
+                            <>
+                              <div className="flex items-center gap-2 px-1">
+                                <Checkbox
+                                  id="select-all-members"
+                                  checked={allSelected}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedMemberIds(prev => [...new Set([...prev, ...filtered.map(m => m.id)])]);
+                                    } else {
+                                      setSelectedMemberIds(prev => prev.filter(id => !filtered.some(m => m.id === id)));
+                                    }
+                                  }}
+                                />
+                                <Label htmlFor="select-all-members" className="text-xs text-slate-500 cursor-pointer">
+                                  {allSelected ? 'Désélectionner tous' : 'Sélectionner tous'}
+                                </Label>
+                              </div>
+                              {/* Scrollable list */}
+                              <div className="max-h-48 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50">
+                                {filtered.length === 0 ? (
+                                  <p className="text-center text-slate-400 py-4 text-sm italic">Aucun membre disponible</p>
+                                ) : filtered.map(m => (
+                                  <div
+                                    key={m.id}
+                                    className={cn(
+                                      "flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-slate-50 transition-colors",
+                                      selectedMemberIds.includes(m.id) && "bg-church-gold/5"
+                                    )}
+                                    onClick={() => setSelectedMemberIds(prev =>
+                                      prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id]
+                                    )}
+                                  >
+                                    <Checkbox
+                                      checked={selectedMemberIds.includes(m.id)}
+                                      onCheckedChange={() => setSelectedMemberIds(prev =>
+                                        prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id]
+                                      )}
+                                    />
+                                    <Avatar className="w-8 h-8">
+                                      <AvatarFallback className="bg-church-gold/10 text-church-gold text-[10px]">
+                                        {m.firstName[0]}{m.lastName[0]}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <p className="text-sm font-medium text-slate-900">{m.firstName} {m.lastName}</p>
+                                      <p className="text-[10px] text-slate-500">{m.phone}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          );
+                        })()}
+                        {/* Selected chips */}
+                        {selectedMemberIds.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {selectedMemberIds.map(id => {
+                              const m = members.find(m => m.id === id);
+                              if (!m) return null;
+                              return (
+                                <span key={id} className="inline-flex items-center gap-1 bg-church-gold/10 text-church-gold text-xs px-2 py-0.5 rounded-full font-medium">
+                                  {m.firstName} {m.lastName}
+                                  <button
+                                    type="button"
+                                    className="ml-0.5 hover:text-church-gold/70"
+                                    onClick={() => setSelectedMemberIds(prev => prev.filter(i => i !== id))}
+                                  >×</button>
+                                </span>
+                              );
+                            })}
                           </div>
-                        </form>
-                      </Form>
+                        )}
+                      </div>
+
+                      {/* Role selector */}
+                      <div className="space-y-3">
+                        <label className="text-sm font-semibold text-slate-700">Rôle / Fonction</label>
+                        <Select value={memberRole} onValueChange={setMemberRole}>
+                          <SelectTrigger className="h-11 border-slate-200">
+                            <SelectValue placeholder="Attribuer un rôle..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="member" className="py-2">Membre actif</SelectItem>
+                            <SelectItem value="assistant" className="py-2">Assistant / Adjoint</SelectItem>
+                            <SelectItem value="leader" className="py-2">Responsable de pôle</SelectItem>
+                            <SelectItem value="autre" className="py-2">Autre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {memberRole === 'autre' && (
+                          <Input
+                            placeholder="Précisez le rôle ou la fonction..."
+                            value={customMemberRole}
+                            onChange={e => setCustomMemberRole(e.target.value)}
+                            className="border-slate-200"
+                          />
+                        )}
+                      </div>
+
+                      <div className="flex gap-3 pt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="flex-1 h-11"
+                          onClick={() => {
+                            setIsAddMemberOpen(false);
+                            setSelectedMemberIds([]);
+                            setMemberPickerSearch('');
+                            setMemberRole('member');
+                            setCustomMemberRole('');
+                          }}
+                        >
+                          Annuler
+                        </Button>
+                        <Button
+                          type="button"
+                          className="flex-1 h-11 bg-church-green hover:bg-church-green/90 text-white font-bold"
+                          onClick={onAddMember}
+                        >
+                          Confirmer l'ajout ({selectedMemberIds.length})
+                        </Button>
+                      </div>
                     </div>
                   </DialogContent>
                 </Dialog>

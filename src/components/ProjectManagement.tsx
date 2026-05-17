@@ -115,7 +115,7 @@ const projectSchema = z.object({
   type: z.enum(['construction', 'mission', 'equipment', 'other']),
   totalBudget: z.coerce.number().min(1, "Budget requis"),
   startDate: z.string().min(1, "Date de début requise"),
-  endDate: z.string().min(1, "Date de fin requise"),
+  endDate: z.string().optional().nullable(),
   leaderId: z.string().min(1, "Responsable requis"),
   churchId: z.string().min(1, "Église requise"),
 });
@@ -154,6 +154,21 @@ function ProjectDetail({ project, onClose }: { project: ChurchProject; onClose: 
   const [isAddContributionOpen, setIsAddContributionOpen] = React.useState(false);
   const [isAnonymousDonation, setIsAnonymousDonation] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  // Project closure
+  const [isProjectClosed, setIsProjectClosed] = React.useState(project.status === 'completed');
+  const [closureDate, setClosureDate] = React.useState<string | null>(null);
+  const [isCloseConfirmOpen, setIsCloseConfirmOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (project.endDate && project.endDate.length > 0 && !isProjectClosed) {
+      const today = new Date();
+      const end = new Date(project.endDate);
+      if (!isNaN(end.getTime()) && today >= end) {
+        setIsProjectClosed(true);
+        setClosureDate(format(end, 'dd MMM yyyy', { locale: fr }));
+      }
+    }
+  }, [project.endDate, isProjectClosed]);
 
   const contributions = projectContributions.filter(c => c.projectId === project.id);
   const expenses = projectExpenses.filter(e => e.projectId === project.id);
@@ -324,7 +339,7 @@ function ProjectDetail({ project, onClose }: { project: ChurchProject; onClose: 
                         <p className="text-xs text-slate-500 uppercase font-bold">Fin prévue</p>
                         <p className="text-sm flex items-center gap-2">
                           <Clock className="w-4 h-4 text-slate-400" />
-                          {format(new Date(project.endDate), 'dd MMM yyyy')}
+                          {project.endDate ? format(new Date(project.endDate), 'dd MMM yyyy') : 'Non définie'}
                         </p>
                       </div>
                     </div>
@@ -499,8 +514,8 @@ function ProjectDetail({ project, onClose }: { project: ChurchProject; onClose: 
                         </div>
                         <Progress value={progress} className="h-2 bg-white/10" />
                       </div>
-                      <div className="flex gap-3 pt-2">
-                        <Button 
+                      <div className="flex flex-wrap gap-3 pt-2">
+                        <Button
                           className="bg-emerald-600 hover:bg-emerald-700 text-xs"
                           onClick={() => setIsAddContributionOpen(true)}
                         >
@@ -543,6 +558,20 @@ function ProjectDetail({ project, onClose }: { project: ChurchProject; onClose: 
                             </div>
                           </DialogContent>
                         </Dialog>
+                        {/* Closure button / badge */}
+                        {isProjectClosed ? (
+                          <Badge className="bg-slate-700 text-white border-none text-xs px-3 py-1.5 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Projet clôturé{closureDate ? ` le ${closureDate}` : ''}
+                          </Badge>
+                        ) : (!project.endDate || project.endDate.length === 0) ? (
+                          <Button
+                            className="bg-rose-600 hover:bg-rose-700 text-white text-xs"
+                            onClick={() => setIsCloseConfirmOpen(true)}
+                          >
+                            Clôturer le projet
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                     <div className="text-center">
@@ -924,6 +953,32 @@ function ProjectDetail({ project, onClose }: { project: ChurchProject; onClose: 
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Project closure confirmation dialog */}
+      <Dialog open={isCloseConfirmOpen} onOpenChange={setIsCloseConfirmOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-rose-600">Clôturer le projet</DialogTitle>
+            <DialogDescription>
+              Confirmez-vous la clôture définitive du projet <strong>"{project.name}"</strong> ? Cette action marquera le projet comme terminé.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-4">
+            <Button variant="ghost" onClick={() => setIsCloseConfirmOpen(false)}>Annuler</Button>
+            <Button
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              onClick={() => {
+                setIsProjectClosed(true);
+                setClosureDate(format(new Date(), 'dd MMM yyyy', { locale: fr }));
+                setIsCloseConfirmOpen(false);
+                toast.success("Projet clôturé avec succès");
+              }}
+            >
+              Confirmer la clôture
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -932,6 +987,7 @@ export function ProjectManagement() {
   const { churchProjects, projectContributions, churches, members, addChurchProject } = useStore();
   const [selectedProjectId, setSelectedProjectId] = React.useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
+  const [hasEndDate, setHasEndDate] = React.useState(false);
 
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema) as any,
@@ -941,7 +997,7 @@ export function ProjectManagement() {
       type: 'construction',
       totalBudget: 0,
       startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0],
+      endDate: null,
       churchId: churches[0]?.id || '1',
     },
   });
@@ -949,9 +1005,11 @@ export function ProjectManagement() {
   const onSubmit = (values: ProjectFormValues) => {
     addChurchProject({
       ...values,
+      endDate: values.endDate || '',
       status: 'pending',
-    });
+    } as any);
     setIsAddDialogOpen(false);
+    setHasEndDate(false);
     form.reset();
     toast.success("Projet créé avec succès");
   };
@@ -1038,17 +1096,41 @@ export function ProjectManagement() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control as any}
-                    name="endDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date de Fin prévue</FormLabel>
-                        <FormControl><Input type="date" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
+                  <FormItem>
+                    <FormLabel>Y a-t-il une date de fin prévue ?</FormLabel>
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className={hasEndDate ? "bg-church-green text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}
+                        onClick={() => { setHasEndDate(true); }}
+                      >
+                        Oui
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className={!hasEndDate ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}
+                        onClick={() => { setHasEndDate(false); form.setValue('endDate' as any, null); }}
+                      >
+                        Non
+                      </Button>
+                    </div>
+                    {hasEndDate && (
+                      <FormField
+                        control={form.control as any}
+                        name="endDate"
+                        render={({ field }) => (
+                          <FormItem className="mt-2">
+                            <FormControl>
+                              <Input type="date" {...field} value={field.value || ''} onChange={e => field.onChange(e.target.value || null)} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
-                  />
+                  </FormItem>
                 </div>
                 <FormField
                   control={form.control as any}

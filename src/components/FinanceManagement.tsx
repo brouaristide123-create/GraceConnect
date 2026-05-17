@@ -96,6 +96,7 @@ const TX_TYPE_FR: Record<string, string> = {
   income: 'Entrée', transfer: 'Virement',
 };
 const PERIOD_FR: Record<string, string> = {
+  'week': 'Cette Semaine', 'lastweek': 'Semaine Passée', 'month': 'Ce Mois',
   '3m': '3 Mois', '6m': '6 Mois', '1y': '1 An',
 };
 const LINKED_TYPE_FR: Record<string, string> = {
@@ -134,6 +135,10 @@ export function FinanceManagement() {
   const [showAIAssistConfirm, setShowAIAssistConfirm] = React.useState(false);
   const [pendingAIAssistToggle, setPendingAIAssistToggle] = React.useState(false);
   const [chartPeriod, setChartPeriod] = React.useState('6m');
+  // Cash register deletion confirmation
+  const [caisseToDeleteId, setCaisseToDeleteId] = React.useState<string | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = React.useState('');
+  const [isDeleteCaisseOpen, setIsDeleteCaisseOpen] = React.useState(false);
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema) as any,
@@ -590,6 +595,9 @@ export function FinanceManagement() {
                     <span className="text-xs">{PERIOD_FR[chartPeriod] || chartPeriod}</span>
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="week">Cette Semaine</SelectItem>
+                    <SelectItem value="lastweek">Semaine Passée</SelectItem>
+                    <SelectItem value="month">Ce Mois</SelectItem>
                     <SelectItem value="3m">3 Mois</SelectItem>
                     <SelectItem value="6m">6 Mois</SelectItem>
                     <SelectItem value="1y">1 An</SelectItem>
@@ -776,10 +784,6 @@ export function FinanceManagement() {
             <ArrowDownRight className="w-4 h-4 mr-2" />
             Dépenses
           </TabsTrigger>
-          <TabsTrigger value="security" className="data-[state=active]:bg-white">
-            <Shield className="w-4 h-4 mr-2" />
-            Sécurité & Accès
-          </TabsTrigger>
           <TabsTrigger value="caisses" className="data-[state=active]:bg-white">
             <Archive className="w-4 h-4 mr-2" />
             Caisses
@@ -965,53 +969,6 @@ export function FinanceManagement() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="security" className="space-y-6">
-          <Card className="border-none shadow-md">
-            <CardHeader>
-              <CardTitle>Gestion des Accès Financiers</CardTitle>
-              <CardDescription>Définissez qui peut voir et modifier les données financières.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                {[
-                  { name: 'Pasteur Principal', role: 'Admin', icon: Shield, color: 'text-rose-600 bg-rose-50' },
-                  { name: 'Trésorier', role: 'Éditeur', icon: UserCog, color: 'text-blue-600 bg-blue-50' },
-                  { name: 'Secrétaire', role: 'Lecture seule', icon: Eye, color: 'text-slate-600 bg-slate-50' },
-                ].map((user) => (
-                  <div key={user.name} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className={cn("p-2 rounded-lg", user.color)}>
-                        <user.icon className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900">{user.name}</p>
-                        <p className="text-xs text-slate-500">{user.role}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm">Gérer</Button>
-                  </div>
-                ))}
-              </div>
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="flex items-center gap-2 mb-3">
-                  <History className="w-4 h-4 text-slate-500" />
-                  <h4 className="text-sm font-semibold">Journal des Actions</h4>
-                </div>
-                <div className="space-y-3">
-                  <p className="text-xs text-slate-600 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    <strong>Trésorier</strong> a ajouté une dépense (Loyer) - <span className="text-slate-400">Il y a 2h</span>
-                  </p>
-                  <p className="text-xs text-slate-600 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <strong>Admin</strong> a validé le rapport mensuel - <span className="text-slate-400">Hier</span>
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         {/* ── CAISSES ── */}
         <TabsContent value="caisses" className="space-y-6">
           <div className="flex items-center justify-between">
@@ -1046,7 +1003,7 @@ export function FinanceManagement() {
                           <CardTitle className="text-base">{reg.name}</CardTitle>
                           {reg.description && <CardDescription className="text-xs mt-1">{reg.description}</CardDescription>}
                         </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-400 hover:text-rose-600" onClick={() => deleteCashRegister(reg.id)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-400 hover:text-rose-600" onClick={() => { setCaisseToDeleteId(reg.id); setDeleteConfirmText(''); setIsDeleteCaisseOpen(true); }}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
@@ -1253,6 +1210,49 @@ export function FinanceManagement() {
                   }}
                 >
                   Enregistrer
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog: Supprimer caisse confirmation */}
+          <Dialog open={isDeleteCaisseOpen} onOpenChange={setIsDeleteCaisseOpen}>
+            <DialogContent className="sm:max-w-[420px]">
+              <DialogHeader>
+                <DialogTitle className="text-rose-600">Supprimer la caisse</DialogTitle>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <p className="text-sm text-slate-600">
+                  Cette action est <strong>irréversible</strong>. Toutes les transactions associées à cette caisse seront perdues.
+                </p>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Tapez <span className="font-mono font-bold text-rose-600">SUPPRIMER</span> pour confirmer</label>
+                  <Input
+                    placeholder="SUPPRIMER"
+                    value={deleteConfirmText}
+                    onChange={e => setDeleteConfirmText(e.target.value)}
+                    className="border-rose-200 focus:ring-rose-500/20"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => { setIsDeleteCaisseOpen(false); setCaisseToDeleteId(null); setDeleteConfirmText(''); }}>
+                  Annuler
+                </Button>
+                <Button
+                  className="bg-rose-600 hover:bg-rose-700 text-white"
+                  disabled={deleteConfirmText !== 'SUPPRIMER'}
+                  onClick={() => {
+                    if (caisseToDeleteId && deleteConfirmText === 'SUPPRIMER') {
+                      deleteCashRegister(caisseToDeleteId);
+                      setIsDeleteCaisseOpen(false);
+                      setCaisseToDeleteId(null);
+                      setDeleteConfirmText('');
+                      toast.success("Caisse supprimée");
+                    }
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Supprimer définitivement
                 </Button>
               </DialogFooter>
             </DialogContent>

@@ -815,6 +815,15 @@ function EventDetail({ event, onBack }: { event: Event, onBack: () => void }) {
   const [isAddTaskOpen, setIsAddTaskOpen] = React.useState(false);
   const [newTaskTitle, setNewTaskTitle] = React.useState('');
   const [selectedMemberToAdd, setSelectedMemberToAdd] = React.useState<string>('');
+  // Multi-select team member picker
+  const [teamMemberPickerSearch, setTeamMemberPickerSearch] = React.useState('');
+  const [selectedTeamMemberIds, setSelectedTeamMemberIds] = React.useState<string[]>([]);
+  // Team deletion confirmation
+  const [teamToDeleteId, setTeamToDeleteId] = React.useState<string | null>(null);
+  const [isDeleteTeamConfirmOpen, setIsDeleteTeamConfirmOpen] = React.useState(false);
+  // Add article to Ventes
+  const [isAddArticleOpen, setIsAddArticleOpen] = React.useState(false);
+  const [newArticle, setNewArticle] = React.useState({ name: '', description: '', price: '', purchasePrice: '', stock: '', imageUrl: '' });
   const galleryInputRef = React.useRef<HTMLInputElement>(null);
   const bannerInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -882,17 +891,18 @@ function EventDetail({ event, onBack }: { event: Event, onBack: () => void }) {
   };
 
   const handleAddMemberToTeam = () => {
-    if (!selectedTeam || !selectedMemberToAdd) return;
-    if (selectedTeam.members.includes(selectedMemberToAdd)) {
-      toast.error("Ce membre est déjà dans l'équipe");
+    if (!selectedTeam || selectedTeamMemberIds.length === 0) return;
+    const newMembers = selectedTeamMemberIds.filter(id => !selectedTeam.members.includes(id));
+    if (newMembers.length === 0) {
+      toast.error("Ces membres sont déjà dans l'équipe");
       return;
     }
-
-    const updatedMembers = [...selectedTeam.members, selectedMemberToAdd];
+    const updatedMembers = [...selectedTeam.members, ...newMembers];
     updateEventTeam(selectedTeam.id, { members: updatedMembers });
     setSelectedTeam({ ...selectedTeam, members: updatedMembers });
-    setSelectedMemberToAdd('');
-    toast.success("Membre ajouté");
+    setSelectedTeamMemberIds([]);
+    setTeamMemberPickerSearch('');
+    toast.success(`${newMembers.length} membre(s) ajouté(s)`);
   };
 
   const handleRemoveMemberFromTeam = (memberId: string) => {
@@ -976,10 +986,18 @@ function EventDetail({ event, onBack }: { event: Event, onBack: () => void }) {
   };
 
   const handleDeleteTeam = (teamId: string) => {
-    if (confirm("Voulez-vous vraiment supprimer cette équipe ?")) {
-      deleteEventTeam(teamId);
+    setTeamToDeleteId(teamId);
+    setIsDeleteTeamConfirmOpen(true);
+  };
+
+  const confirmDeleteTeam = () => {
+    if (!teamToDeleteId) return;
+    {
+      deleteEventTeam(teamToDeleteId);
       setIsManageTeamOpen(false);
       setSelectedTeam(null);
+      setIsDeleteTeamConfirmOpen(false);
+      setTeamToDeleteId(null);
       toast.success("Équipe supprimée");
     }
   };
@@ -1648,18 +1666,75 @@ function EventDetail({ event, onBack }: { event: Event, onBack: () => void }) {
                         </TabsList>
                         
                         <TabsContent value="members" className="space-y-4 mt-4">
-                          <div className="flex gap-2">
-                            <Select value={selectedMemberToAdd} onValueChange={setSelectedMemberToAdd}>
-                              <SelectTrigger className="flex-1">
-                                <SelectValue placeholder="Ajouter un membre..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {members.filter(m => !selectedTeam.members.includes(m.id)).map(m => (
-                                  <SelectItem key={m.id} value={m.id}>{m.firstName} {m.lastName}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button onClick={handleAddMemberToTeam} disabled={!selectedMemberToAdd} className="bg-church-gold text-white">Ajouter</Button>
+                          <div className="space-y-2">
+                            {/* Multi-select picker */}
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                              <Input
+                                className="pl-9 h-9 text-sm"
+                                placeholder="Rechercher un membre..."
+                                value={teamMemberPickerSearch}
+                                onChange={e => setTeamMemberPickerSearch(e.target.value)}
+                              />
+                            </div>
+                            {(() => {
+                              const available = members.filter(m => !selectedTeam.members.includes(m.id));
+                              const filtered = available.filter(m =>
+                                `${m.firstName} ${m.lastName}`.toLowerCase().includes(teamMemberPickerSearch.toLowerCase())
+                              );
+                              const allSel = filtered.length > 0 && filtered.every(m => selectedTeamMemberIds.includes(m.id));
+                              return (
+                                <>
+                                  <div className="flex items-center gap-2 px-1">
+                                    <Checkbox
+                                      id="team-select-all"
+                                      checked={allSel}
+                                      onCheckedChange={(chk) => {
+                                        if (chk) setSelectedTeamMemberIds(prev => [...new Set([...prev, ...filtered.map(m => m.id)])]);
+                                        else setSelectedTeamMemberIds(prev => prev.filter(id => !filtered.some(m => m.id === id)));
+                                      }}
+                                    />
+                                    <label htmlFor="team-select-all" className="text-xs text-slate-500 cursor-pointer">
+                                      {allSel ? 'Désélectionner tous' : 'Sélectionner tous'}
+                                    </label>
+                                  </div>
+                                  <div className="max-h-40 overflow-y-auto border border-slate-100 rounded-lg divide-y divide-slate-50">
+                                    {filtered.length === 0 ? (
+                                      <p className="text-center text-slate-400 py-3 text-xs italic">Aucun membre disponible</p>
+                                    ) : filtered.map(m => (
+                                      <div
+                                        key={m.id}
+                                        className={cn("flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-50", selectedTeamMemberIds.includes(m.id) && "bg-church-gold/5")}
+                                        onClick={() => setSelectedTeamMemberIds(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id])}
+                                      >
+                                        <Checkbox checked={selectedTeamMemberIds.includes(m.id)} onCheckedChange={() => setSelectedTeamMemberIds(prev => prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id])} />
+                                        <Avatar className="w-6 h-6">
+                                          <AvatarFallback className="text-[9px]">{m.firstName[0]}{m.lastName[0]}</AvatarFallback>
+                                        </Avatar>
+                                        <span className="text-sm font-medium">{m.firstName} {m.lastName}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {selectedTeamMemberIds.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      {selectedTeamMemberIds.map(id => {
+                                        const m = members.find(m => m.id === id);
+                                        if (!m) return null;
+                                        return (
+                                          <span key={id} className="inline-flex items-center gap-1 bg-church-gold/10 text-church-gold text-xs px-2 py-0.5 rounded-full">
+                                            {m.firstName} {m.lastName}
+                                            <button type="button" onClick={() => setSelectedTeamMemberIds(prev => prev.filter(i => i !== id))}>×</button>
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                            <Button onClick={handleAddMemberToTeam} disabled={selectedTeamMemberIds.length === 0} className="bg-church-gold text-white w-full text-sm h-9">
+                              Ajouter ({selectedTeamMemberIds.length}) membre(s)
+                            </Button>
                           </div>
 
                           <div className="space-y-2">
@@ -1738,6 +1813,31 @@ function EventDetail({ event, onBack }: { event: Event, onBack: () => void }) {
                       </Tabs>
                     </>
                   )}
+                </DialogContent>
+              </Dialog>
+
+              {/* Team deletion confirmation dialog */}
+              <Dialog open={isDeleteTeamConfirmOpen} onOpenChange={setIsDeleteTeamConfirmOpen}>
+                <DialogContent className="sm:max-w-[420px]">
+                  <DialogHeader>
+                    <DialogTitle className="text-rose-600">Supprimer l'équipe</DialogTitle>
+                    <DialogDescription>
+                      Êtes-vous sûr de vouloir supprimer l'équipe{' '}
+                      {teamToDeleteId && (() => {
+                        const t = eventTeams.find(t => t.id === teamToDeleteId);
+                        return t ? <span className="font-bold">« {t.name === 'welcome' ? 'Accueil' : t.name === 'security' ? 'Sécurité' : t.name === 'media' ? 'Média' : t.name === 'logistics' ? 'Logistique' : t.name} »</span> : null;
+                      })()}
+                      {' '}? Cette action est irréversible.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter className="gap-2 pt-2">
+                    <Button variant="ghost" onClick={() => { setIsDeleteTeamConfirmOpen(false); setTeamToDeleteId(null); }}>
+                      Annuler
+                    </Button>
+                    <Button className="bg-rose-600 hover:bg-rose-700 text-white" onClick={confirmDeleteTeam}>
+                      <Trash2 className="w-4 h-4 mr-2" /> Supprimer
+                    </Button>
+                  </DialogFooter>
                 </DialogContent>
               </Dialog>
             </TabsContent>
@@ -1822,19 +1922,86 @@ function EventDetail({ event, onBack }: { event: Event, onBack: () => void }) {
 
             <TabsContent value="merchandise" className="space-y-6">
               <Card className="border-none shadow-sm">
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <ShoppingBag className="w-5 h-5 text-church-gold" />
                     Articles en vente
                   </CardTitle>
+                  <Dialog open={isAddArticleOpen} onOpenChange={setIsAddArticleOpen}>
+                    <DialogTrigger render={<Button size="sm" className="bg-church-gold hover:bg-church-gold/90 text-white">
+                      <Plus className="w-4 h-4 mr-2" /> Ajouter Article
+                    </Button>} />
+                    <DialogContent className="sm:max-w-[500px]">
+                      <DialogHeader>
+                        <DialogTitle>Ajouter un article en vente</DialogTitle>
+                        <DialogDescription>Ajoutez un article au catalogue de vente de cet événement.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="col-span-2 space-y-2">
+                            <label className="text-sm font-medium">Nom de l'article *</label>
+                            <Input placeholder="ex: T-Shirt, CD, Livre..." value={newArticle.name} onChange={e => setNewArticle(a => ({...a, name: e.target.value}))} />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-rose-500 font-bold">Prix d'achat (FCFA)</label>
+                            <Input type="number" placeholder="0" value={newArticle.purchasePrice} onChange={e => setNewArticle(a => ({...a, purchasePrice: e.target.value}))} />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-emerald-600 font-bold">Prix de vente (FCFA) *</label>
+                            <Input type="number" placeholder="0" value={newArticle.price} onChange={e => setNewArticle(a => ({...a, price: e.target.value}))} />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Stock</label>
+                            <Input type="number" placeholder="Illimité si vide" value={newArticle.stock} onChange={e => setNewArticle(a => ({...a, stock: e.target.value}))} />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">URL Image</label>
+                            <Input placeholder="https://..." value={newArticle.imageUrl} onChange={e => setNewArticle(a => ({...a, imageUrl: e.target.value}))} />
+                          </div>
+                          <div className="col-span-2 space-y-2">
+                            <label className="text-sm font-medium">Description</label>
+                            <Input placeholder="Description courte de l'article..." value={newArticle.description} onChange={e => setNewArticle(a => ({...a, description: e.target.value}))} />
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAddArticleOpen(false)}>Annuler</Button>
+                        <Button
+                          className="bg-church-gold text-white"
+                          onClick={() => {
+                            if (!newArticle.name || !newArticle.price) {
+                              toast.error("Nom et prix de vente requis");
+                              return;
+                            }
+                            const currentMerch = event.merchandise || [];
+                            const article: any = {
+                              id: `art-${Date.now()}`,
+                              name: newArticle.name,
+                              description: newArticle.description,
+                              price: parseFloat(newArticle.price) || 0,
+                              purchasePrice: newArticle.purchasePrice ? parseFloat(newArticle.purchasePrice) : undefined,
+                              stock: newArticle.stock ? parseInt(newArticle.stock) : undefined,
+                              imageUrls: newArticle.imageUrl ? [newArticle.imageUrl] : [],
+                            };
+                            updateEvent(event.id, { merchandise: [...currentMerch, article] });
+                            setNewArticle({ name: '', description: '', price: '', purchasePrice: '', stock: '', imageUrl: '' });
+                            setIsAddArticleOpen(false);
+                            toast.success("Article ajouté avec succès");
+                          }}
+                        >
+                          Ajouter l'article
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </CardHeader>
                 <CardContent>
                   {!event.merchandise || event.merchandise.length === 0 ? (
                     <div className="text-center py-12">
                       <ShoppingBag className="w-12 h-12 text-slate-100 mx-auto mb-4" />
                       <p className="text-slate-400 italic">Aucun article enregistré pour cet événement.</p>
-                      <Button variant="outline" className="mt-4" onClick={() => toast.info("Modifiez l'événement pour ajouter des articles.")}>
-                        Modifier l'événement
+                      <Button variant="outline" className="mt-4" onClick={() => setIsAddArticleOpen(true)}>
+                        <Plus className="w-4 h-4 mr-2" /> Ajouter un article
                       </Button>
                     </div>
                   ) : (

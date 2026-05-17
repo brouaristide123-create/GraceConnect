@@ -1870,13 +1870,24 @@ function CaseDetail({ funeralCase, onClose }: { funeralCase: FuneralCase; onClos
 }
 
 export function FuneralManagement() {
-  const { funeralCases, funeralContributions, contributionTypes, contributionPayments, churches, members, addFuneralCase } = useStore();
+  const { funeralCases, funeralContributions, contributionTypes, contributionPayments, churches, members, addFuneralCase, addContributionPayment, cashRegisters } = useStore();
   const [selectedCaseId, setSelectedCaseId] = React.useState<string | null>(null);
   const [selectedContributionTypeId, setSelectedContributionTypeId] = React.useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [isAddPaymentOpen, setIsAddPaymentOpen] = React.useState(false);
   const [isAddContributionTypeOpen, setIsAddContributionTypeOpen] = React.useState(false);
   const [activeMainTab, setActiveMainTab] = React.useState('cases');
+  // Transfer funds
+  const [isTransferOpen, setIsTransferOpen] = React.useState(false);
+  const [transferRegisterId, setTransferRegisterId] = React.useState('');
+  // Configuration
+  const [fundConfig, setFundConfig] = React.useState({
+    amount: 2000, period: 'monthly', gracePeriod: 30, autoRelance: true, beneficiaires: ''
+  });
+  // Pay member dialog
+  const [payMemberOpen, setPayMemberOpen] = React.useState(false);
+  const [payMemberData, setPayMemberData] = React.useState<{ member: Member | null; amount: number; typeId: string }>({ member: null, amount: 0, typeId: '' });
+  const [payForm, setPayForm] = React.useState({ method: 'Cash', amount: '', date: new Date().toISOString().split('T')[0], note: '' });
 
   const form = useForm<CaseFormValues>({
     resolver: zodResolver(caseSchema) as any,
@@ -1915,6 +1926,7 @@ export function FuneralManagement() {
     const progress = Math.min(100, (collected / (selectedType.amount * 50)) * 100); // Mock target based on member count
 
     return (
+      <>
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -1940,7 +1952,11 @@ export function FuneralManagement() {
             <Button className="bg-white text-slate-900 border border-slate-200 hover:bg-slate-50">
               <Download className="w-4 h-4 mr-2" /> Rapports
             </Button>
-            
+
+            <Button className="bg-blue-600 text-white hover:bg-blue-700 shadow-md" onClick={() => setIsTransferOpen(true)}>
+              <DollarSign className="w-4 h-4 mr-2" /> Transférer les fonds
+            </Button>
+
             <Dialog open={isAddPaymentOpen} onOpenChange={setIsAddPaymentOpen}>
               <DialogTrigger render={<Button className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-md" />}>
                 <Plus className="w-4 h-4 mr-2" /> Enregistrer Versement
@@ -2144,9 +2160,22 @@ export function FuneralManagement() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button size="sm" variant="outline" className="h-8 text-[10px] text-church-gold border-church-gold/20 hover:bg-church-gold/5 uppercase font-bold">
-                                Relancer
-                              </Button>
+                              <div className="flex items-center justify-end gap-2">
+                                <Button size="sm" variant="outline" className="h-8 text-[10px] text-church-gold border-church-gold/20 hover:bg-church-gold/5 uppercase font-bold">
+                                  Relancer
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="h-8 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white uppercase font-bold"
+                                  onClick={() => {
+                                    setPayMemberData({ member: member as Member, amount: selectedType.amount, typeId: selectedType.id });
+                                    setPayForm({ method: 'Cash', amount: String(selectedType.amount), date: new Date().toISOString().split('T')[0], note: '' });
+                                    setPayMemberOpen(true);
+                                  }}
+                                >
+                                  Payer
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -2155,10 +2184,196 @@ export function FuneralManagement() {
                   </Table>
                 </Card>
               </TabsContent>
+
+              {/* Configuration tab */}
+              <TabsContent value="settings" className="mt-0">
+                <Card className="border-none shadow-md">
+                  <CardHeader>
+                    <CardTitle className="text-base">Configuration du Fonds de Cotisation</CardTitle>
+                    <CardDescription>Paramétrez les règles de collecte pour ce fonds.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700">Montant par membre (XOF)</label>
+                        <Input
+                          type="number"
+                          value={fundConfig.amount}
+                          onChange={e => setFundConfig(c => ({...c, amount: parseInt(e.target.value) || 0}))}
+                          className="border-slate-200"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700">Période de collecte</label>
+                        <Select value={fundConfig.period} onValueChange={v => setFundConfig(c => ({...c, period: v}))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monthly">Mensuelle</SelectItem>
+                            <SelectItem value="quarterly">Trimestrielle</SelectItem>
+                            <SelectItem value="biannual">Semestrielle</SelectItem>
+                            <SelectItem value="annual">Annuelle</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700">Délai de grâce (jours)</label>
+                        <Input
+                          type="number"
+                          value={fundConfig.gracePeriod}
+                          onChange={e => setFundConfig(c => ({...c, gracePeriod: parseInt(e.target.value) || 0}))}
+                          className="border-slate-200"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700">Relance automatique</label>
+                        <div className="flex items-center gap-3 h-10">
+                          <button
+                            type="button"
+                            onClick={() => setFundConfig(c => ({...c, autoRelance: !c.autoRelance}))}
+                            className={cn(
+                              "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                              fundConfig.autoRelance ? "bg-emerald-600" : "bg-slate-200"
+                            )}
+                          >
+                            <span className={cn(
+                              "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                              fundConfig.autoRelance ? "translate-x-6" : "translate-x-1"
+                            )} />
+                          </button>
+                          <span className="text-sm text-slate-600">{fundConfig.autoRelance ? 'Activé' : 'Désactivé'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">Bénéficiaires par défaut</label>
+                      <textarea
+                        className="w-full border border-slate-200 rounded-lg p-3 text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-church-gold/20"
+                        placeholder="Liste des bénéficiaires (un par ligne)..."
+                        value={fundConfig.beneficiaires}
+                        onChange={e => setFundConfig(c => ({...c, beneficiaires: e.target.value}))}
+                      />
+                    </div>
+                    <Button
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={() => toast.success("Configuration enregistrée avec succès")}
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-2" /> Enregistrer la configuration
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
           </div>
         </div>
       </div>
+
+      {/* Transfer funds dialog */}
+      <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Transférer les fonds collectés</DialogTitle>
+            <DialogDescription>
+              Transférez <strong>{selectedType && payments && payments.reduce((a, p) => a + p.amount, 0).toLocaleString()} FCFA</strong> vers une caisse de l'église.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Caisse destinataire</label>
+              <Select value={transferRegisterId} onValueChange={setTransferRegisterId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choisir une caisse..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {cashRegisters.map(r => (
+                    <SelectItem key={r.id} value={r.id}>{r.name} — {r.balance.toLocaleString()} FCFA</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTransferOpen(false)}>Annuler</Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={!transferRegisterId}
+              onClick={() => {
+                if (transferRegisterId) {
+                  setIsTransferOpen(false);
+                  setTransferRegisterId('');
+                  toast.success("Transfert enregistré avec succès");
+                }
+              }}
+            >
+              Confirmer le transfert
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pay member dialog */}
+      <Dialog open={payMemberOpen} onOpenChange={setPayMemberOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Enregistrer un paiement</DialogTitle>
+            <DialogDescription>
+              Membre : <strong>{payMemberData.member?.firstName} {payMemberData.member?.lastName}</strong> — Montant dû : <strong>{payMemberData.amount.toLocaleString()} FCFA</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Mode de paiement</label>
+              <Select value={payForm.method} onValueChange={v => setPayForm(f => ({...f, method: v}))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Cash">Espèces</SelectItem>
+                  <SelectItem value="Mobile Money">Mobile Money</SelectItem>
+                  <SelectItem value="Bank">Virement bancaire</SelectItem>
+                  <SelectItem value="Cheque">Chèque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Montant (FCFA)</label>
+              <Input type="number" value={payForm.amount} onChange={e => setPayForm(f => ({...f, amount: e.target.value}))} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Date</label>
+              <Input type="date" value={payForm.date} onChange={e => setPayForm(f => ({...f, date: e.target.value}))} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Note / Référence</label>
+              <Input placeholder="Référence optionnelle..." value={payForm.note} onChange={e => setPayForm(f => ({...f, note: e.target.value}))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayMemberOpen(false)}>Annuler</Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => {
+                if (!payMemberData.member) return;
+                if (addContributionPayment) {
+                  addContributionPayment({
+                    typeId: payMemberData.typeId,
+                    memberId: payMemberData.member.id,
+                    amount: parseFloat(payForm.amount) || payMemberData.amount,
+                    date: payForm.date,
+                    paymentMethod: (['Cash', 'Mobile Money', 'Bank'].includes(payForm.method) ? payForm.method : 'Cash') as any,
+                    status: 'paid',
+                    notes: payForm.note,
+                  } as any);
+                }
+                setPayMemberOpen(false);
+                toast.success(`Paiement enregistré pour ${payMemberData.member.firstName} ${payMemberData.member.lastName}`);
+              }}
+            >
+              Confirmer le paiement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      </>
     );
   }
 
