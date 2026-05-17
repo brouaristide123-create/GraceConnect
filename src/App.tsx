@@ -1,3 +1,4 @@
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useStore } from './lib/store';
 import { Layout } from './components/Layout';
@@ -53,7 +54,32 @@ import { SuiviSpirituelManagement } from './components/SuiviSpirituelManagement'
 import { CashRegistersManagement } from './components/CashRegistersManagement';
 
 export default function App() {
-  const { isAuthenticated, currentUser } = useStore();
+  const { isAuthenticated, currentUser, churchSettings } = useStore();
+
+  // ── Application du thème ──────────────────────────────────────
+  React.useEffect(() => {
+    const theme = churchSettings?.theme ?? 'clair';
+    const html = document.documentElement;
+
+    const applyDark = (dark: boolean) => {
+      if (dark) html.classList.add('dark');
+      else html.classList.remove('dark');
+    };
+
+    if (theme === 'sombre') {
+      applyDark(true);
+    } else if (theme === 'clair') {
+      applyDark(false);
+    } else {
+      // Auto : suit la préférence système
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      applyDark(mq.matches);
+      const handler = (e: MediaQueryListEvent) => applyDark(e.matches);
+      mq.addEventListener('change', handler);
+      return () => mq.removeEventListener('change', handler);
+    }
+  }, [churchSettings?.theme]);
+  // ─────────────────────────────────────────────────────────────
 
   return (
     <Router>

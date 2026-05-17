@@ -520,13 +520,17 @@ export function SettingsManagement() {
                   ].map(t => (
                     <button
                       key={t.val}
-                      disabled={!genEdit}
-                      onClick={() => setGenForm(p => ({...p, theme: t.val as 'clair' | 'sombre' | 'auto'}))}
+                      onClick={() => {
+                        // Le thème s'applique instantanément (pas besoin de "Modifier")
+                        const newTheme = t.val as 'clair' | 'sombre' | 'auto';
+                        setGenForm(p => ({...p, theme: newTheme}));
+                        updateChurchSettings({ theme: newTheme });
+                      }}
                       className={cn(
-                        "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-sm font-medium",
-                        genForm.theme === t.val ? "border-church-green bg-church-green/5 text-church-green" : "border-slate-200 text-slate-600",
-                        genEdit && "hover:border-slate-300 cursor-pointer",
-                        !genEdit && "cursor-default"
+                        "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-sm font-medium cursor-pointer hover:border-slate-300",
+                        genForm.theme === t.val
+                          ? "border-church-green bg-church-green/5 text-church-green"
+                          : "border-slate-200 text-slate-600"
                       )}
                     >
                       <span className="text-2xl">{t.icon}</span>
@@ -534,6 +538,7 @@ export function SettingsManagement() {
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-slate-400">Le thème s'applique immédiatement sans avoir à cliquer sur "Modifier".</p>
               </div>
 
               <div className="space-y-2">
