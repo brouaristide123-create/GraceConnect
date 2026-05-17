@@ -139,7 +139,7 @@ export function Layout({ children }: LayoutProps) {
   }, [currentUser]);
 
   return (
-    <div className="h-screen flex bg-slate-50 overflow-hidden">
+    <div className="h-screen flex bg-slate-50 dark:bg-background overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-church-dark text-white shrink-0">
         <div className="p-6">
@@ -242,7 +242,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8">
+        <header className="h-16 bg-white dark:bg-card border-b border-slate-200 dark:border-border flex items-center justify-between px-4 md:px-8">
           <div className="flex items-center gap-4">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger render={
@@ -341,7 +341,7 @@ export function Layout({ children }: LayoutProps) {
                 </div>
               </SheetContent>
             </Sheet>
-            <h2 className="text-lg font-medium text-slate-700 hidden md:block">
+            <h2 className="text-lg font-medium text-slate-700 dark:text-foreground hidden md:block">
               {navItems.find(item => item.href === location.pathname)?.name || 'Ekklesia'}
             </h2>
           </div>
@@ -350,18 +350,18 @@ export function Layout({ children }: LayoutProps) {
               <Bell className="w-5 h-5 text-slate-500" />
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
             </Button>
-            <div className="h-8 w-px bg-slate-200 mx-2 hidden md:block"></div>
+            <div className="h-8 w-px bg-slate-200 dark:bg-border mx-2 hidden md:block"></div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-700 hidden sm:block">Siège Central</span>
-              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                <ChurchIcon className="w-4 h-4 text-slate-500" />
+              <span className="text-sm font-medium text-slate-700 dark:text-foreground hidden sm:block">Siège Central</span>
+              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-muted flex items-center justify-center">
+                <ChurchIcon className="w-4 h-4 text-slate-500 dark:text-muted-foreground" />
               </div>
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 dark:bg-background">
           {children}
         </main>
       </div>
