@@ -1,15 +1,14 @@
 "use client"
 
 /**
- * Select components — implémentation native <select>
- * ───────────────────────────────────────────────────────────────────────────
- * API identique à l'ancienne (Select, SelectTrigger, SelectContent,
- * SelectItem, SelectValue, SelectGroup, SelectLabel, SelectSeparator…)
- * mais le rendu utilise un <select> HTML natif :
- *   • border violette, flèche custom, look identique à la capture d'écran
- *   • liste déroulante native du navigateur avec scrollbar intégrée
- *   • toutes les options sont des <option> ou <optgroup> natifs
- * ───────────────────────────────────────────────────────────────────────────
+ * Select — implémentation native <select>
+ * ─────────────────────────────────────────────────────────────────────────────
+ * La détection des enfants utilise des RÉFÉRENCES de fonctions (child.type ===
+ * SelectItem) et non des noms, car Vite minifie les noms en production.
+ * Les déclarations `function` sont hissées (hoisting) donc l'ordre dans le
+ * fichier n'a pas d'importance : collectData peut référencer SelectItem même
+ * si SelectItem est déclaré plus bas.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import * as React from "react"
@@ -47,7 +46,9 @@ const SelectCtx = React.createContext<SelectCtxValue>({
   optGroups: [],
 })
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── childrenToString ─────────────────────────────────────────────────────────
+// Convertit n'importe quel ReactNode en chaîne lisible.
+// Gère : "string", 42, ["Jean", " ", "Kouadio"], <span>text</span>, etc.
 
 function childrenToString(children: React.ReactNode): string {
   if (children === null || children === undefined) return ""
@@ -61,12 +62,10 @@ function childrenToString(children: React.ReactNode): string {
   return String(children)
 }
 
-function getCompName(el: React.ReactElement): string {
-  const t = el.type
-  if (typeof t === "string") return t
-  if (typeof t === "function") return (t as any).displayName || (t as any).name || ""
-  return ""
-}
+// ── collectData ──────────────────────────────────────────────────────────────
+// Parcourt l'arbre React AVANT le rendu pour collecter options et placeholder.
+// Utilise child.type === SelectItem (référence) — production-safe.
+// Les fonctions sont hissées (hoisting) donc pas de problème d'ordre.
 
 interface Collected {
   options: OptionItem[]
@@ -81,20 +80,21 @@ function collectData(children: React.ReactNode): Collected {
 
   React.Children.forEach(children, (child) => {
     if (!React.isValidElement(child)) return
-    const name = getCompName(child)
+    const t = child.type
     const p = child.props as any
 
-    if (name === "SelectContent") {
+    // ── SelectContent ────────────────────────────────────────────────────
+    if (t === SelectContent) {
       const inner = collectData(p.children)
       options.push(...inner.options)
       optGroups.push(...inner.optGroups)
       if (inner.placeholder) placeholder = inner.placeholder
 
-    } else if (name === "SelectGroup") {
-      // Cherche un SelectLabel dans ce groupe
+    // ── SelectGroup ──────────────────────────────────────────────────────
+    } else if (t === SelectGroup) {
       let groupLabel = ""
-      React.Children.forEach(p.children, (gc: any) => {
-        if (React.isValidElement(gc) && getCompName(gc) === "SelectLabel") {
+      React.Children.forEach(p.children, (gc: unknown) => {
+        if (React.isValidElement(gc) && gc.type === SelectLabel) {
           groupLabel = childrenToString((gc.props as any).children)
         }
       })
@@ -103,26 +103,39 @@ function collectData(children: React.ReactNode): Collected {
         optGroups.push({ label: groupLabel, options: inner.options })
       } else {
         options.push(...inner.options)
+        optGroups.push(...inner.optGroups)
       }
 
-    } else if (name === "SelectItem") {
+    // ── SelectItem ───────────────────────────────────────────────────────
+    } else if (t === SelectItem) {
       options.push({
         value: p.value ?? "",
         label: childrenToString(p.children),
         disabled: !!p.disabled,
       })
 
-    } else if (name === "SelectTrigger") {
-      // Cherche SelectValue dans le trigger pour récupérer le placeholder
-      React.Children.forEach(p.children, (tc: any) => {
-        if (React.isValidElement(tc) && getCompName(tc) === "SelectValue") {
-          if ((tc.props as any).placeholder) placeholder = (tc.props as any).placeholder
+    // ── SelectTrigger — cherche SelectValue pour placeholder ─────────────
+    } else if (t === SelectTrigger) {
+      React.Children.forEach(p.children, (tc: unknown) => {
+        if (React.isValidElement(tc)) {
+          if (tc.type === SelectValue && (tc.props as any).placeholder) {
+            placeholder = (tc.props as any).placeholder
+          }
         }
       })
 
-    } else if (name === "SelectValue") {
+    // ── SelectValue ──────────────────────────────────────────────────────
+    } else if (t === SelectValue) {
       if (p.placeholder) placeholder = p.placeholder
 
+    // ── Fragment React ───────────────────────────────────────────────────
+    } else if (t === React.Fragment) {
+      const inner = collectData(p.children)
+      options.push(...inner.options)
+      optGroups.push(...inner.optGroups)
+      if (inner.placeholder) placeholder = inner.placeholder
+
+    // ── Tout autre conteneur (FormControl, FormItem, div…) ───────────────
     } else if (p?.children) {
       const inner = collectData(p.children)
       options.push(...inner.options)
@@ -143,9 +156,8 @@ export interface SelectProps {
   disabled?: boolean
   children?: React.ReactNode
   name?: string
-  /** Taille du trigger */
   size?: "sm" | "default"
-  // props ignorées (compat. API ancienne)
+  // compat. API ancienne — ignorées
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }
@@ -158,6 +170,7 @@ function Select({
   children,
   size = "default",
 }: SelectProps) {
+  // collectData traverse l'arbre JSX pour extraire toutes les options
   const { options, optGroups, placeholder } = collectData(children)
 
   return (
@@ -169,46 +182,39 @@ function Select({
   )
 }
 
-// ── SelectTrigger — rendu du <select> natif ──────────────────────────────────
+// ── SelectTrigger — le seul composant qui rend du DOM ───────────────────────
 
 export interface SelectTriggerProps {
   className?: string
   size?: "sm" | "default"
-  children?: React.ReactNode // ignoré (compat. API ancienne)
+  /** Ignoré (compat. API) — le trigger est entièrement géré via contexte */
+  children?: React.ReactNode
   style?: React.CSSProperties
 }
 
 function SelectTrigger({ className, size: sizeProp, style }: SelectTriggerProps) {
   const ctx = React.useContext(SelectCtx)
-  const size = sizeProp ?? ctx.size ?? "default"
+  const sz = sizeProp ?? ctx.size ?? "default"
 
   return (
     <div className={cn("relative w-full", className)} style={style}>
       <select
-        value={ctx.value ?? ""}
+        value={ctx.value !== undefined ? ctx.value : undefined}
         defaultValue={ctx.defaultValue}
         disabled={ctx.disabled}
-        onChange={(e) => {
-          const v = e.target.value
-          ctx.onValueChange?.(v)
-        }}
+        onChange={(e) => ctx.onValueChange?.(e.target.value)}
         className={cn(
-          // Style de base
-          "w-full appearance-none rounded-md border bg-white text-sm text-slate-800 cursor-pointer",
-          "pl-3 pr-8 transition-colors outline-none",
-          // Bordure violette comme la capture
+          "w-full appearance-none rounded-md border bg-white text-sm text-slate-800",
+          "pl-3 pr-8 transition-colors outline-none cursor-pointer",
           "border-violet-400 focus:border-violet-600 focus:ring-2 focus:ring-violet-300/40",
-          // Dark mode
           "dark:bg-zinc-800 dark:text-zinc-100 dark:border-violet-500 dark:focus:border-violet-400",
-          // Disabled
           "disabled:opacity-50 disabled:cursor-not-allowed",
-          // Hauteur selon taille
-          size === "sm" ? "h-8 text-xs" : "h-9",
+          sz === "sm" ? "h-8 text-xs" : "h-9",
         )}
       >
-        {/* Option placeholder si défini */}
+        {/* Placeholder (option désactivée si une vraie valeur est sélectionnée) */}
         {ctx.placeholder && (
-          <option value="" disabled={ctx.value !== undefined && ctx.value !== ""}>
+          <option value="">
             {ctx.placeholder}
           </option>
         )}
@@ -220,7 +226,7 @@ function SelectTrigger({ className, size: sizeProp, style }: SelectTriggerProps)
           </option>
         ))}
 
-        {/* Groupes d'options */}
+        {/* Groupes */}
         {ctx.optGroups.map((grp) => (
           <optgroup key={grp.label} label={grp.label}>
             {grp.options.map((opt) => (
@@ -232,7 +238,7 @@ function SelectTrigger({ className, size: sizeProp, style }: SelectTriggerProps)
         ))}
       </select>
 
-      {/* Flèche custom (la flèche native est cachée par appearance-none) */}
+      {/* Flèche personnalisée */}
       <ChevronDownIcon
         className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 dark:text-zinc-400"
         aria-hidden
@@ -241,8 +247,7 @@ function SelectTrigger({ className, size: sizeProp, style }: SelectTriggerProps)
   )
 }
 
-// ── Composants "fantômes" — présents pour compat. API, ne rendent rien ────────
-// Le rendu réel est dans SelectTrigger via le contexte.
+// ── Composants "fantômes" — API compat, ne rendent rien ─────────────────────
 
 export interface SelectContentProps {
   children?: React.ReactNode
@@ -254,7 +259,6 @@ export interface SelectContentProps {
   alignItemWithTrigger?: boolean
 }
 function SelectContent({ children }: SelectContentProps) {
-  // Rien à rendre — les options sont collectées par Select via collectData()
   return null
 }
 
@@ -282,7 +286,6 @@ export interface SelectGroupProps {
   className?: string
 }
 function SelectGroup({ children }: SelectGroupProps) {
-  // Juste un conteneur logique, pas de rendu visuel
   return <>{children}</>
 }
 
@@ -294,17 +297,29 @@ function SelectLabel(_props: SelectLabelProps) {
   return null
 }
 
-function SelectSeparator({ className }: { className?: string }) {
+function SelectSeparator(_props: { className?: string }) {
   return null
 }
 
-function SelectScrollUpButton(_props: any) {
+function SelectScrollUpButton(_props: unknown) {
   return null
 }
 
-function SelectScrollDownButton(_props: any) {
+function SelectScrollDownButton(_props: unknown) {
   return null
 }
+
+// ── displayName — préservés même après minification ─────────────────────────
+Select.displayName = "Select"
+SelectTrigger.displayName = "SelectTrigger"
+SelectContent.displayName = "SelectContent"
+SelectItem.displayName = "SelectItem"
+SelectValue.displayName = "SelectValue"
+SelectGroup.displayName = "SelectGroup"
+SelectLabel.displayName = "SelectLabel"
+SelectSeparator.displayName = "SelectSeparator"
+SelectScrollUpButton.displayName = "SelectScrollUpButton"
+SelectScrollDownButton.displayName = "SelectScrollDownButton"
 
 // ── Exports ──────────────────────────────────────────────────────────────────
 
