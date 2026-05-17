@@ -1,5 +1,5 @@
 import React from 'react';
-import { useStore } from '../lib/store';
+import { useStore, DEFAULT_CHURCH_SETTINGS, ChurchSettings } from '../lib/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -32,16 +32,16 @@ import {
   Trash2,
   Plus,
   Eye,
-  EyeOff,
   Smartphone,
   Mail,
   MessageSquare,
   Lock,
   RefreshCw,
   Database,
-  ChevronRight,
   Info,
   Pencil,
+  X,
+  Save,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { format } from 'date-fns';
@@ -93,26 +93,66 @@ const FAKE_ARCHIVES = [
   { name: 'Sauvegarde_01-05-2026.zip', size: '3.7 Mo', date: '01/05/2026' },
 ];
 
+// ── Toolbar par section ───────────────────────────────────────────
+function SectionToolbar({
+  editing,
+  onEdit,
+  onSave,
+  onCancel,
+}: { editing: boolean; onEdit: () => void; onSave: () => void; onCancel: () => void }) {
+  if (!editing) {
+    return (
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          className="gap-2 border-church-green text-church-green hover:bg-church-green/5"
+          onClick={onEdit}
+        >
+          <Pencil className="w-4 h-4" />
+          Modifier
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex justify-end gap-3">
+      <Button variant="outline" className="gap-2 text-slate-600" onClick={onCancel}>
+        <X className="w-4 h-4" />
+        Annuler
+      </Button>
+      <Button className="bg-church-gold hover:bg-church-gold/90 text-white gap-2 px-6" onClick={onSave}>
+        <Save className="w-4 h-4" />
+        Enregistrer
+      </Button>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────
 
 export function SettingsManagement() {
-  const { currentUser, updateUser, churches, updateChurch } = useStore();
+  const { currentUser, churches, updateChurch, churchSettings: stored, updateChurchSettings } = useStore();
   const church = churches.find((c) => c.id === currentUser?.churchId);
 
-  // ── 1. Informations Générales ──────────────────────────────────
+  // Valeurs persistées (fallback sur défaut si vieux localStorage sans ce champ)
+  const s: ChurchSettings = stored ?? DEFAULT_CHURCH_SETTINGS;
+
+  // ── États locaux (draft de chaque section) ────────────────────
+  const [genEdit, setGenEdit] = React.useState(false);
   const [genForm, setGenForm] = React.useState({
     name: church?.name || 'Église de Grâce',
-    slogan: 'Grandir ensemble dans la foi',
     address: church?.address || '12 Rue de la Paix, Cocody',
     city: church?.city || 'Abidjan',
-    country: church?.country || 'Côte d\'Ivoire',
-    primaryColor: '#10b981',
-    theme: 'clair',
-    timezone: 'Africa/Abidjan',
+    country: church?.country || "Côte d'Ivoire",
+    slogan: s.slogan,
+    primaryColor: s.primaryColor,
+    theme: s.theme,
+    timezone: s.timezone,
   });
 
-  // ── 2. Utilisateurs & Rôles ───────────────────────────────────
+  const [rolesEdit, setRolesEdit] = React.useState(false);
   const [rolePerms, setRolePerms] = React.useState<Record<string, Record<string, boolean>>>(() => {
+    if (s.rolePerms && Object.keys(s.rolePerms).length > 0) return s.rolePerms;
     const init: Record<string, Record<string, boolean>> = {};
     DEFAULT_ROLES.forEach(r => {
       init[r.id] = {};
@@ -122,61 +162,178 @@ export function SettingsManagement() {
   });
   const [selectedRole, setSelectedRole] = React.useState('pasteur');
 
-  // ── 3. Paramètres Financiers ──────────────────────────────────
+  const [finEdit, setFinEdit] = React.useState(false);
   const [finSettings, setFinSettings] = React.useState({
-    currency: 'XOF',
-    defaultRegister: '',
-    mobileMoneyOrange: true,
-    mobileMoneyMTN: true,
-    mobileMoneyWave: false,
-    autoReceipt: true,
-    receiptEmail: false,
-    receiptWhatsapp: false,
-    fiscalMonth: '1',
+    currency: s.currency,
+    mobileMoneyOrange: s.mobileMoneyOrange,
+    mobileMoneyMTN: s.mobileMoneyMTN,
+    mobileMoneyWave: s.mobileMoneyWave,
+    autoReceipt: s.autoReceipt,
+    receiptEmail: s.receiptEmail,
+    receiptWhatsapp: s.receiptWhatsapp,
+    fiscalMonth: s.fiscalMonth,
   });
 
-  // ── 4. Paramètres des Membres ─────────────────────────────────
+  const [membEdit, setMembEdit] = React.useState(false);
   const [memberSettings, setMemberSettings] = React.useState({
-    matriculeFormat: 'MBR-{YEAR}-{SEQ}',
-    archiveAfterMonths: '12',
-    photoRequired: false,
-    birthDateRequired: true,
-    phoneRequired: true,
-    groupByDepartment: true,
+    matriculeFormat: s.matriculeFormat,
+    archiveAfterMonths: s.archiveAfterMonths,
+    photoRequired: s.photoRequired,
+    birthDateRequired: s.birthDateRequired,
+    phoneRequired: s.phoneRequired,
+    groupByDepartment: s.groupByDepartment,
   });
 
-  // ── 5. Paramètres des Documents ───────────────────────────────
+  const [docEdit, setDocEdit] = React.useState(false);
   const [docSettings, setDocSettings] = React.useState({
-    baptismCert: true,
-    marriageCert: true,
-    trainingCert: true,
-    logoOnDocs: true,
-    signatureEnabled: false,
-    headerText: 'Église de Grâce — Abidjan',
-    footerText: 'Document officiel — Ne pas modifier',
+    baptismCert: s.baptismCert,
+    marriageCert: s.marriageCert,
+    trainingCert: s.trainingCert,
+    logoOnDocs: s.logoOnDocs,
+    signatureEnabled: s.signatureEnabled,
+    headerText: s.headerText,
+    footerText: s.footerText,
   });
 
-  // ── 6. Notifications ─────────────────────────────────────────
+  const [notifEdit, setNotifEdit] = React.useState(false);
   const [notifInt, setNotifInt] = React.useState({
-    newMembers: true, events: true, finances: true, urgences: true,
+    newMembers: s.notifNewMembers,
+    events: s.notifEvents,
+    finances: s.notifFinances,
+    urgences: s.notifUrgences,
   });
   const [notifExt, setNotifExt] = React.useState({
-    sms: false, smsProvider: '', whatsapp: false, email: true, smtpServer: 'smtp.gmail.com',
+    sms: s.notifSms,
+    smsProvider: s.notifSmsProvider,
+    whatsapp: s.notifWhatsapp,
+    email: s.notifEmail,
+    smtpServer: s.notifSmtpServer,
   });
 
-  // ── 7. Sécurité ──────────────────────────────────────────────
+  const [secEdit, setSecEdit] = React.useState(false);
   const [secSettings, setSecSettings] = React.useState({
-    twoFactor: false, maxLoginAttempts: '5', sessionTimeout: '60', showActivityLog: true,
+    twoFactor: s.twoFactor,
+    maxLoginAttempts: s.maxLoginAttempts,
+    sessionTimeout: s.sessionTimeout,
+    showActivityLog: s.showActivityLog,
   });
 
-  // ── 8. Sauvegarde & Archives ──────────────────────────────────
+  const [backupEdit, setBackupEdit] = React.useState(false);
   const [backupSettings, setBackupSettings] = React.useState({
-    dailyBackup: true, weeklyBackup: true, backupTime: '02:00',
-    autoExportPDF: false, autoExportExcel: false, retentionMonths: '6',
+    dailyBackup: s.dailyBackup,
+    weeklyBackup: s.weeklyBackup,
+    backupTime: s.backupTime,
+    autoExportPDF: s.autoExportPDF,
+    autoExportExcel: s.autoExportExcel,
+    retentionMonths: s.retentionMonths,
   });
 
-  // ── save helpers ──────────────────────────────────────────────
-  const save = (section: string) => toast.success(`${section} enregistré avec succès`);
+  // ── Fonctions de réinitialisation (Annuler) ───────────────────
+  const resetGen = () => {
+    const fresh = stored ?? DEFAULT_CHURCH_SETTINGS;
+    setGenForm({
+      name: church?.name || 'Église de Grâce',
+      address: church?.address || '',
+      city: church?.city || '',
+      country: church?.country || '',
+      slogan: fresh.slogan,
+      primaryColor: fresh.primaryColor,
+      theme: fresh.theme as 'clair' | 'sombre' | 'auto',
+      timezone: fresh.timezone,
+    });
+    setGenEdit(false);
+  };
+  const resetRoles = () => {
+    const fresh = stored ?? DEFAULT_CHURCH_SETTINGS;
+    if (fresh.rolePerms && Object.keys(fresh.rolePerms).length > 0) {
+      setRolePerms(fresh.rolePerms);
+    }
+    setRolesEdit(false);
+  };
+  const resetFin = () => {
+    const fresh = stored ?? DEFAULT_CHURCH_SETTINGS;
+    setFinSettings({ currency: fresh.currency, mobileMoneyOrange: fresh.mobileMoneyOrange, mobileMoneyMTN: fresh.mobileMoneyMTN, mobileMoneyWave: fresh.mobileMoneyWave, autoReceipt: fresh.autoReceipt, receiptEmail: fresh.receiptEmail, receiptWhatsapp: fresh.receiptWhatsapp, fiscalMonth: fresh.fiscalMonth });
+    setFinEdit(false);
+  };
+  const resetMemb = () => {
+    const fresh = stored ?? DEFAULT_CHURCH_SETTINGS;
+    setMemberSettings({ matriculeFormat: fresh.matriculeFormat, archiveAfterMonths: fresh.archiveAfterMonths, photoRequired: fresh.photoRequired, birthDateRequired: fresh.birthDateRequired, phoneRequired: fresh.phoneRequired, groupByDepartment: fresh.groupByDepartment });
+    setMembEdit(false);
+  };
+  const resetDoc = () => {
+    const fresh = stored ?? DEFAULT_CHURCH_SETTINGS;
+    setDocSettings({ baptismCert: fresh.baptismCert, marriageCert: fresh.marriageCert, trainingCert: fresh.trainingCert, logoOnDocs: fresh.logoOnDocs, signatureEnabled: fresh.signatureEnabled, headerText: fresh.headerText, footerText: fresh.footerText });
+    setDocEdit(false);
+  };
+  const resetNotif = () => {
+    const fresh = stored ?? DEFAULT_CHURCH_SETTINGS;
+    setNotifInt({ newMembers: fresh.notifNewMembers, events: fresh.notifEvents, finances: fresh.notifFinances, urgences: fresh.notifUrgences });
+    setNotifExt({ sms: fresh.notifSms, smsProvider: fresh.notifSmsProvider, whatsapp: fresh.notifWhatsapp, email: fresh.notifEmail, smtpServer: fresh.notifSmtpServer });
+    setNotifEdit(false);
+  };
+  const resetSec = () => {
+    const fresh = stored ?? DEFAULT_CHURCH_SETTINGS;
+    setSecSettings({ twoFactor: fresh.twoFactor, maxLoginAttempts: fresh.maxLoginAttempts, sessionTimeout: fresh.sessionTimeout, showActivityLog: fresh.showActivityLog });
+    setSecEdit(false);
+  };
+  const resetBackup = () => {
+    const fresh = stored ?? DEFAULT_CHURCH_SETTINGS;
+    setBackupSettings({ dailyBackup: fresh.dailyBackup, weeklyBackup: fresh.weeklyBackup, backupTime: fresh.backupTime, autoExportPDF: fresh.autoExportPDF, autoExportExcel: fresh.autoExportExcel, retentionMonths: fresh.retentionMonths });
+    setBackupEdit(false);
+  };
+
+  // ── Fonctions de sauvegarde ────────────────────────────────────
+  const saveGen = () => {
+    if (!genForm.name.trim()) { toast.error("Le nom de l'église est obligatoire"); return; }
+    if (church) {
+      updateChurch(church.id, { name: genForm.name, address: genForm.address, city: genForm.city, country: genForm.country });
+    }
+    updateChurchSettings({ slogan: genForm.slogan, primaryColor: genForm.primaryColor, theme: genForm.theme, timezone: genForm.timezone });
+    toast.success('Informations générales enregistrées ✓');
+    setGenEdit(false);
+  };
+  const saveRoles = () => {
+    updateChurchSettings({ rolePerms });
+    toast.success('Rôles et permissions enregistrés ✓');
+    setRolesEdit(false);
+  };
+  const saveFin = () => {
+    updateChurchSettings({ currency: finSettings.currency, fiscalMonth: finSettings.fiscalMonth, mobileMoneyOrange: finSettings.mobileMoneyOrange, mobileMoneyMTN: finSettings.mobileMoneyMTN, mobileMoneyWave: finSettings.mobileMoneyWave, autoReceipt: finSettings.autoReceipt, receiptEmail: finSettings.receiptEmail, receiptWhatsapp: finSettings.receiptWhatsapp });
+    toast.success('Paramètres financiers enregistrés ✓');
+    setFinEdit(false);
+  };
+  const saveMemb = () => {
+    updateChurchSettings({ matriculeFormat: memberSettings.matriculeFormat, archiveAfterMonths: memberSettings.archiveAfterMonths, photoRequired: memberSettings.photoRequired, birthDateRequired: memberSettings.birthDateRequired, phoneRequired: memberSettings.phoneRequired, groupByDepartment: memberSettings.groupByDepartment });
+    toast.success('Paramètres des membres enregistrés ✓');
+    setMembEdit(false);
+  };
+  const saveDoc = () => {
+    updateChurchSettings({ baptismCert: docSettings.baptismCert, marriageCert: docSettings.marriageCert, trainingCert: docSettings.trainingCert, logoOnDocs: docSettings.logoOnDocs, signatureEnabled: docSettings.signatureEnabled, headerText: docSettings.headerText, footerText: docSettings.footerText });
+    toast.success('Paramètres des documents enregistrés ✓');
+    setDocEdit(false);
+  };
+  const saveNotif = () => {
+    updateChurchSettings({ notifNewMembers: notifInt.newMembers, notifEvents: notifInt.events, notifFinances: notifInt.finances, notifUrgences: notifInt.urgences, notifSms: notifExt.sms, notifSmsProvider: notifExt.smsProvider, notifWhatsapp: notifExt.whatsapp, notifEmail: notifExt.email, notifSmtpServer: notifExt.smtpServer });
+    toast.success('Paramètres de notifications enregistrés ✓');
+    setNotifEdit(false);
+  };
+  const saveSec = () => {
+    updateChurchSettings({ twoFactor: secSettings.twoFactor, maxLoginAttempts: secSettings.maxLoginAttempts, sessionTimeout: secSettings.sessionTimeout, showActivityLog: secSettings.showActivityLog });
+    toast.success('Paramètres de sécurité enregistrés ✓');
+    setSecEdit(false);
+  };
+  const saveBackup = () => {
+    updateChurchSettings({ dailyBackup: backupSettings.dailyBackup, weeklyBackup: backupSettings.weeklyBackup, backupTime: backupSettings.backupTime, autoExportPDF: backupSettings.autoExportPDF, autoExportExcel: backupSettings.autoExportExcel, retentionMonths: backupSettings.retentionMonths });
+    toast.success('Paramètres de sauvegarde enregistrés ✓');
+    setBackupEdit(false);
+  };
+
+  // ── Helpers de rendu : champ en lecture seule vs modifiable ───
+  const RO = ({ value, placeholder }: { value: string; placeholder?: string }) => (
+    <div className="px-3 py-2 rounded-lg border border-slate-100 bg-slate-50 text-sm text-slate-700 min-h-[36px]">
+      {value || <span className="text-slate-400 italic">{placeholder || '—'}</span>}
+    </div>
+  );
 
   return (
     <div className="space-y-8">
@@ -185,7 +342,7 @@ export function SettingsManagement() {
           <Settings className="w-8 h-8 text-church-gold" />
           Paramètres
         </h1>
-        <p className="text-slate-500 mt-1">Configuration complète de votre espace de gestion multi-églises.</p>
+        <p className="text-slate-500 mt-1">Configuration complète de votre espace de gestion.</p>
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
@@ -236,10 +393,12 @@ export function SettingsManagement() {
                   G
                 </div>
                 <div className="space-y-2">
-                  <Button variant="outline" className="gap-2">
-                    <Upload className="w-4 h-4" />
-                    Changer le logo
-                  </Button>
+                  {genEdit && (
+                    <Button variant="outline" className="gap-2">
+                      <Upload className="w-4 h-4" />
+                      Changer le logo
+                    </Button>
+                  )}
                   <p className="text-xs text-slate-400">PNG, JPG ou SVG · Max 2 Mo · Recommandé : 512×512px</p>
                 </div>
               </div>
@@ -256,29 +415,39 @@ export function SettingsManagement() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Nom de l'église *</Label>
-                  <Input value={genForm.name} onChange={e => setGenForm(p => ({...p, name: e.target.value}))} />
+                  {genEdit
+                    ? <Input value={genForm.name} onChange={e => setGenForm(p => ({...p, name: e.target.value}))} />
+                    : <RO value={genForm.name} />}
                 </div>
                 <div className="space-y-2">
                   <Label>Slogan / Devise</Label>
-                  <Input value={genForm.slogan} onChange={e => setGenForm(p => ({...p, slogan: e.target.value}))} placeholder="Ex: Grandir ensemble dans la foi" />
+                  {genEdit
+                    ? <Input value={genForm.slogan} onChange={e => setGenForm(p => ({...p, slogan: e.target.value}))} placeholder="Ex: Grandir ensemble dans la foi" />
+                    : <RO value={genForm.slogan} placeholder="Non défini" />}
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Adresse</Label>
-                <Input value={genForm.address} onChange={e => setGenForm(p => ({...p, address: e.target.value}))} />
+                {genEdit
+                  ? <Input value={genForm.address} onChange={e => setGenForm(p => ({...p, address: e.target.value}))} />
+                  : <RO value={genForm.address} />}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Ville</Label>
-                  <Input value={genForm.city} onChange={e => setGenForm(p => ({...p, city: e.target.value}))} />
+                  {genEdit
+                    ? <Input value={genForm.city} onChange={e => setGenForm(p => ({...p, city: e.target.value}))} />
+                    : <RO value={genForm.city} />}
                 </div>
                 <div className="space-y-2">
                   <Label>Pays</Label>
-                  <Input value={genForm.country} onChange={e => setGenForm(p => ({...p, country: e.target.value}))} />
+                  {genEdit
+                    ? <Input value={genForm.country} onChange={e => setGenForm(p => ({...p, country: e.target.value}))} />
+                    : <RO value={genForm.country} />}
                 </div>
               </div>
 
-              {/* Code église & Abonnement (read-only) */}
+              {/* Code église & Abonnement (toujours read-only) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1">
@@ -288,7 +457,7 @@ export function SettingsManagement() {
                     <Input value="GRC-2024-0001" disabled className="bg-slate-50 font-mono text-sm" />
                     <Badge className="bg-emerald-100 text-emerald-700 border-none shrink-0">Actif</Badge>
                   </div>
-                  <p className="text-xs text-slate-400">Identifiant unique de votre église sur la plateforme.</p>
+                  <p className="text-xs text-slate-400">Identifiant unique de votre église — non modifiable.</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Plan d'abonnement</Label>
@@ -313,26 +482,34 @@ export function SettingsManagement() {
             <CardContent className="space-y-6">
               <div className="space-y-3">
                 <Label>Couleur principale</Label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="color"
-                    value={genForm.primaryColor}
-                    onChange={e => setGenForm(p => ({...p, primaryColor: e.target.value}))}
-                    className="w-12 h-10 rounded-lg border border-slate-200 cursor-pointer"
-                  />
-                  <Input value={genForm.primaryColor} onChange={e => setGenForm(p => ({...p, primaryColor: e.target.value}))} className="w-36 font-mono text-sm" />
-                  <div className="flex gap-2">
-                    {['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'].map(c => (
-                      <button
-                        key={c}
-                        className="w-7 h-7 rounded-full border-2 transition-all hover:scale-110"
-                        style={{backgroundColor: c, borderColor: genForm.primaryColor === c ? '#0f172a' : 'transparent'}}
-                        onClick={() => setGenForm(p => ({...p, primaryColor: c}))}
-                      />
-                    ))}
+                {genEdit ? (
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="color"
+                      value={genForm.primaryColor}
+                      onChange={e => setGenForm(p => ({...p, primaryColor: e.target.value}))}
+                      className="w-12 h-10 rounded-lg border border-slate-200 cursor-pointer"
+                    />
+                    <Input value={genForm.primaryColor} onChange={e => setGenForm(p => ({...p, primaryColor: e.target.value}))} className="w-36 font-mono text-sm" />
+                    <div className="flex gap-2">
+                      {['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'].map(c => (
+                        <button
+                          key={c}
+                          className="w-7 h-7 rounded-full border-2 transition-all hover:scale-110"
+                          style={{backgroundColor: c, borderColor: genForm.primaryColor === c ? '#0f172a' : 'transparent'}}
+                          onClick={() => setGenForm(p => ({...p, primaryColor: c}))}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full border border-slate-200" style={{backgroundColor: genForm.primaryColor}} />
+                    <span className="font-mono text-sm text-slate-700">{genForm.primaryColor}</span>
+                  </div>
+                )}
               </div>
+
               <div className="space-y-3">
                 <Label>Thème d'interface</Label>
                 <div className="grid grid-cols-3 gap-3">
@@ -343,10 +520,13 @@ export function SettingsManagement() {
                   ].map(t => (
                     <button
                       key={t.val}
-                      onClick={() => setGenForm(p => ({...p, theme: t.val}))}
+                      disabled={!genEdit}
+                      onClick={() => setGenForm(p => ({...p, theme: t.val as 'clair' | 'sombre' | 'auto'}))}
                       className={cn(
                         "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-sm font-medium",
-                        genForm.theme === t.val ? "border-church-green bg-church-green/5 text-church-green" : "border-slate-200 text-slate-600 hover:border-slate-300"
+                        genForm.theme === t.val ? "border-church-green bg-church-green/5 text-church-green" : "border-slate-200 text-slate-600",
+                        genEdit && "hover:border-slate-300 cursor-pointer",
+                        !genEdit && "cursor-default"
                       )}
                     >
                       <span className="text-2xl">{t.icon}</span>
@@ -355,34 +535,34 @@ export function SettingsManagement() {
                   ))}
                 </div>
               </div>
+
               <div className="space-y-2">
                 <Label>Fuseau horaire</Label>
-                <Select value={genForm.timezone} onValueChange={v => setGenForm(p => ({...p, timezone: v}))}>
-                  <SelectTrigger>
-                    <span className="text-sm">{TIMEZONE_FR[genForm.timezone] || genForm.timezone}</span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(TIMEZONE_FR).map(([v, l]) => (
-                      <SelectItem key={v} value={v}>{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {genEdit ? (
+                  <Select value={genForm.timezone} onValueChange={v => setGenForm(p => ({...p, timezone: v}))}>
+                    <SelectTrigger>
+                      <span className="text-sm">{TIMEZONE_FR[genForm.timezone] || genForm.timezone}</span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(TIMEZONE_FR).map(([v, l]) => (
+                        <SelectItem key={v} value={v}>{l}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <RO value={TIMEZONE_FR[genForm.timezone] || genForm.timezone} />
+                )}
               </div>
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => save('Informations générales')}>
-              Enregistrer les modifications
-            </Button>
-          </div>
+          <SectionToolbar editing={genEdit} onEdit={() => setGenEdit(true)} onSave={saveGen} onCancel={resetGen} />
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════
             2. UTILISATEURS & RÔLES
         ══════════════════════════════════════════════════════════ */}
         <TabsContent value="roles" className="space-y-6">
-          {/* Rôles */}
           <Card className="border-none shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -393,9 +573,11 @@ export function SettingsManagement() {
                   </CardTitle>
                   <CardDescription>Définissez les accès de chaque rôle au sein de l'église.</CardDescription>
                 </div>
-                <Button size="sm" className="bg-church-green text-white gap-1">
-                  <Plus className="w-3.5 h-3.5" />Nouveau rôle
-                </Button>
+                {rolesEdit && (
+                  <Button size="sm" className="bg-church-green text-white gap-1">
+                    <Plus className="w-3.5 h-3.5" />Nouveau rôle
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -414,7 +596,6 @@ export function SettingsManagement() {
                 ))}
               </div>
 
-              {/* Role info */}
               {(() => {
                 const role = DEFAULT_ROLES.find(r => r.id === selectedRole);
                 if (!role) return null;
@@ -431,8 +612,9 @@ export function SettingsManagement() {
                           <div key={mod} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:bg-slate-50 transition-colors">
                             <span className="text-sm text-slate-700">{mod}</span>
                             <Switch
+                              disabled={!rolesEdit}
                               checked={rolePerms[selectedRole]?.[mod] ?? false}
-                              onCheckedChange={v => setRolePerms(p => ({
+                              onCheckedChange={v => rolesEdit && setRolePerms(p => ({
                                 ...p,
                                 [selectedRole]: { ...p[selectedRole], [mod]: v }
                               }))}
@@ -454,16 +636,16 @@ export function SettingsManagement() {
               <CardDescription>Appareils actuellement connectés à votre compte.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {FAKE_SESSIONS.map((s, i) => (
+              {FAKE_SESSIONS.map((sess, i) => (
                 <div key={i} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className={cn("w-2 h-2 rounded-full", s.current ? "bg-emerald-500" : "bg-slate-300")} />
+                    <div className={cn("w-2 h-2 rounded-full", sess.current ? "bg-emerald-500" : "bg-slate-300")} />
                     <div>
-                      <p className="text-sm font-medium text-slate-900">{s.device}</p>
-                      <p className="text-xs text-slate-400">{s.location} · {s.lastSeen}</p>
+                      <p className="text-sm font-medium text-slate-900">{sess.device}</p>
+                      <p className="text-xs text-slate-400">{sess.location} · {sess.lastSeen}</p>
                     </div>
                   </div>
-                  {s.current
+                  {sess.current
                     ? <Badge className="bg-emerald-100 text-emerald-700 border-none text-xs">Session actuelle</Badge>
                     : <Button size="sm" variant="outline" className="text-rose-600 border-rose-200 hover:bg-rose-50 text-xs">Révoquer</Button>
                   }
@@ -475,11 +657,7 @@ export function SettingsManagement() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => save('Paramètres des rôles')}>
-              Enregistrer
-            </Button>
-          </div>
+          <SectionToolbar editing={rolesEdit} onEdit={() => setRolesEdit(true)} onSave={saveRoles} onCancel={resetRoles} />
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════
@@ -496,31 +674,39 @@ export function SettingsManagement() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Devise principale</Label>
-                <Select value={finSettings.currency} onValueChange={v => setFinSettings(p => ({...p, currency: v}))}>
-                  <SelectTrigger>
-                    <span className="text-sm">{CURRENCY_FR[finSettings.currency] || finSettings.currency}</span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(CURRENCY_FR).map(([v, l]) => (
-                      <SelectItem key={v} value={v}>{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {finEdit ? (
+                  <Select value={finSettings.currency} onValueChange={v => setFinSettings(p => ({...p, currency: v}))}>
+                    <SelectTrigger>
+                      <span className="text-sm">{CURRENCY_FR[finSettings.currency] || finSettings.currency}</span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(CURRENCY_FR).map(([v, l]) => (
+                        <SelectItem key={v} value={v}>{l}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <RO value={CURRENCY_FR[finSettings.currency] || finSettings.currency} />
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Mois de début d'exercice fiscal</Label>
-                <Select value={finSettings.fiscalMonth} onValueChange={v => setFinSettings(p => ({...p, fiscalMonth: v}))}>
-                  <SelectTrigger>
-                    <span className="text-sm">
-                      {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][parseInt(finSettings.fiscalMonth) - 1]}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m, i) => (
-                      <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {finEdit ? (
+                  <Select value={finSettings.fiscalMonth} onValueChange={v => setFinSettings(p => ({...p, fiscalMonth: v}))}>
+                    <SelectTrigger>
+                      <span className="text-sm">
+                        {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][parseInt(finSettings.fiscalMonth) - 1]}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m, i) => (
+                        <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <RO value={['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][parseInt(finSettings.fiscalMonth) - 1]} />
+                )}
               </div>
             </CardContent>
           </Card>
@@ -545,8 +731,9 @@ export function SettingsManagement() {
                     </div>
                   </div>
                   <Switch
+                    disabled={!finEdit}
                     checked={finSettings[op.key as keyof typeof finSettings] as boolean}
-                    onCheckedChange={v => setFinSettings(p => ({...p, [op.key]: v}))}
+                    onCheckedChange={v => finEdit && setFinSettings(p => ({...p, [op.key]: v}))}
                   />
                 </div>
               ))}
@@ -560,28 +747,25 @@ export function SettingsManagement() {
             <CardContent className="space-y-3">
               {[
                 { key: 'autoReceipt', label: 'Générer un reçu à chaque transaction', desc: 'Reçu PDF automatiquement créé' },
-                { key: 'receiptEmail', label: 'Envoyer le reçu par email', desc: 'Si l\'email du membre est renseigné' },
+                { key: 'receiptEmail', label: 'Envoyer le reçu par email', desc: "Si l'email du membre est renseigné" },
                 { key: 'receiptWhatsapp', label: 'Envoyer le reçu par WhatsApp', desc: 'Si le numéro WhatsApp est renseigné' },
-              ].map(s => (
-                <div key={s.key} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+              ].map(opt => (
+                <div key={opt.key} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">{s.label}</p>
-                    <p className="text-xs text-slate-400">{s.desc}</p>
+                    <p className="text-sm font-medium text-slate-900">{opt.label}</p>
+                    <p className="text-xs text-slate-400">{opt.desc}</p>
                   </div>
                   <Switch
-                    checked={finSettings[s.key as keyof typeof finSettings] as boolean}
-                    onCheckedChange={v => setFinSettings(p => ({...p, [s.key]: v}))}
+                    disabled={!finEdit}
+                    checked={finSettings[opt.key as keyof typeof finSettings] as boolean}
+                    onCheckedChange={v => finEdit && setFinSettings(p => ({...p, [opt.key]: v}))}
                   />
                 </div>
               ))}
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => save('Paramètres financiers')}>
-              Enregistrer
-            </Button>
-          </div>
+          <SectionToolbar editing={finEdit} onEdit={() => setFinEdit(true)} onSave={saveFin} onCancel={resetFin} />
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════
@@ -599,20 +783,17 @@ export function SettingsManagement() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Modèle de matricule</Label>
-                <Input
-                  value={memberSettings.matriculeFormat}
-                  onChange={e => setMemberSettings(p => ({...p, matriculeFormat: e.target.value}))}
-                  className="font-mono"
-                />
+                {membEdit
+                  ? <Input value={memberSettings.matriculeFormat} onChange={e => setMemberSettings(p => ({...p, matriculeFormat: e.target.value}))} className="font-mono" />
+                  : <RO value={memberSettings.matriculeFormat} />}
                 <p className="text-xs text-slate-400">
-                  Variables disponibles : <code className="bg-slate-100 px-1 rounded">{'{YEAR}'}</code> = année,{' '}
-                  <code className="bg-slate-100 px-1 rounded">{'{SEQ}'}</code> = séquence, <code className="bg-slate-100 px-1 rounded">{'{CHURCH}'}</code> = code église
+                  Variables : <code className="bg-slate-100 px-1 rounded">{'{YEAR}'}</code> <code className="bg-slate-100 px-1 rounded">{'{SEQ}'}</code> <code className="bg-slate-100 px-1 rounded">{'{CHURCH}'}</code>
                 </p>
               </div>
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex items-center gap-3">
                 <Info className="w-4 h-4 text-slate-400 shrink-0" />
                 <p className="text-xs text-slate-600">
-                  Exemple avec le format actuel : <strong className="font-mono">MBR-2026-0042</strong>
+                  Exemple : <strong className="font-mono">MBR-2026-0042</strong>
                 </p>
               </div>
             </CardContent>
@@ -626,15 +807,10 @@ export function SettingsManagement() {
               <div className="space-y-2">
                 <Label>Archiver automatiquement après (mois d'inactivité)</Label>
                 <div className="flex items-center gap-3">
-                  <Input
-                    type="number"
-                    min="1"
-                    max="60"
-                    value={memberSettings.archiveAfterMonths}
-                    onChange={e => setMemberSettings(p => ({...p, archiveAfterMonths: e.target.value}))}
-                    className="w-24"
-                  />
-                  <span className="text-sm text-slate-500">mois sans activité enregistrée</span>
+                  {membEdit
+                    ? <Input type="number" min="1" max="60" value={memberSettings.archiveAfterMonths} onChange={e => setMemberSettings(p => ({...p, archiveAfterMonths: e.target.value}))} className="w-24" />
+                    : <RO value={`${memberSettings.archiveAfterMonths} mois`} />}
+                  {membEdit && <span className="text-sm text-slate-500">mois sans activité enregistrée</span>}
                 </div>
               </div>
             </CardContent>
@@ -646,30 +822,27 @@ export function SettingsManagement() {
             </CardHeader>
             <CardContent className="space-y-3">
               {[
-                { key: 'photoRequired', label: 'Photo de profil obligatoire', desc: 'Le membre doit fournir une photo lors de l\'inscription' },
+                { key: 'photoRequired', label: 'Photo de profil obligatoire', desc: "Le membre doit fournir une photo lors de l'inscription" },
                 { key: 'birthDateRequired', label: 'Date de naissance obligatoire', desc: '' },
                 { key: 'phoneRequired', label: 'Numéro de téléphone obligatoire', desc: '' },
                 { key: 'groupByDepartment', label: 'Regrouper les membres par département', desc: 'Affiche les membres organisés par département dans les listes' },
-              ].map(s => (
-                <div key={s.key} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+              ].map(opt => (
+                <div key={opt.key} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">{s.label}</p>
-                    {s.desc && <p className="text-xs text-slate-400">{s.desc}</p>}
+                    <p className="text-sm font-medium text-slate-900">{opt.label}</p>
+                    {opt.desc && <p className="text-xs text-slate-400">{opt.desc}</p>}
                   </div>
                   <Switch
-                    checked={memberSettings[s.key as keyof typeof memberSettings] as boolean}
-                    onCheckedChange={v => setMemberSettings(p => ({...p, [s.key]: v}))}
+                    disabled={!membEdit}
+                    checked={memberSettings[opt.key as keyof typeof memberSettings] as boolean}
+                    onCheckedChange={v => membEdit && setMemberSettings(p => ({...p, [opt.key]: v}))}
                   />
                 </div>
               ))}
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => save('Paramètres des membres')}>
-              Enregistrer
-            </Button>
-          </div>
+          <SectionToolbar editing={membEdit} onEdit={() => setMembEdit(true)} onSave={saveMemb} onCancel={resetMemb} />
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════
@@ -703,8 +876,9 @@ export function SettingsManagement() {
                       <Eye className="w-3.5 h-3.5 mr-1" />Aperçu
                     </Button>
                     <Switch
+                      disabled={!docEdit}
                       checked={docSettings[c.key as keyof typeof docSettings] as boolean}
-                      onCheckedChange={v => setDocSettings(p => ({...p, [c.key]: v}))}
+                      onCheckedChange={v => docEdit && setDocSettings(p => ({...p, [c.key]: v}))}
                     />
                   </div>
                 </div>
@@ -719,19 +893,15 @@ export function SettingsManagement() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Texte d'en-tête</Label>
-                <Input
-                  value={docSettings.headerText}
-                  onChange={e => setDocSettings(p => ({...p, headerText: e.target.value}))}
-                  placeholder="Ex: Église de Grâce — Abidjan"
-                />
+                {docEdit
+                  ? <Input value={docSettings.headerText} onChange={e => setDocSettings(p => ({...p, headerText: e.target.value}))} placeholder="Ex: Église de Grâce — Abidjan" />
+                  : <RO value={docSettings.headerText} placeholder="Non défini" />}
               </div>
               <div className="space-y-2">
                 <Label>Texte de pied de page</Label>
-                <Input
-                  value={docSettings.footerText}
-                  onChange={e => setDocSettings(p => ({...p, footerText: e.target.value}))}
-                  placeholder="Ex: Document officiel — Ne pas modifier"
-                />
+                {docEdit
+                  ? <Input value={docSettings.footerText} onChange={e => setDocSettings(p => ({...p, footerText: e.target.value}))} placeholder="Ex: Document officiel — Ne pas modifier" />
+                  : <RO value={docSettings.footerText} placeholder="Non défini" />}
               </div>
             </CardContent>
           </Card>
@@ -746,7 +916,7 @@ export function SettingsManagement() {
                   <p className="text-sm font-medium text-slate-900">Logo sur les documents</p>
                   <p className="text-xs text-slate-400">Le logo de l'église apparaît en haut de chaque document imprimé</p>
                 </div>
-                <Switch checked={docSettings.logoOnDocs} onCheckedChange={v => setDocSettings(p => ({...p, logoOnDocs: v}))} />
+                <Switch disabled={!docEdit} checked={docSettings.logoOnDocs} onCheckedChange={v => docEdit && setDocSettings(p => ({...p, logoOnDocs: v}))} />
               </div>
               <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100">
                 <div>
@@ -754,22 +924,18 @@ export function SettingsManagement() {
                   <p className="text-xs text-slate-400">Appose une signature numérique en bas des certificats</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {docSettings.signatureEnabled && (
+                  {docSettings.signatureEnabled && docEdit && (
                     <Button size="sm" variant="outline" className="text-xs gap-1">
                       <Upload className="w-3 h-3" />Uploader
                     </Button>
                   )}
-                  <Switch checked={docSettings.signatureEnabled} onCheckedChange={v => setDocSettings(p => ({...p, signatureEnabled: v}))} />
+                  <Switch disabled={!docEdit} checked={docSettings.signatureEnabled} onCheckedChange={v => docEdit && setDocSettings(p => ({...p, signatureEnabled: v}))} />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => save('Paramètres des documents')}>
-              Enregistrer
-            </Button>
-          </div>
+          <SectionToolbar editing={docEdit} onEdit={() => setDocEdit(true)} onSave={saveDoc} onCancel={resetDoc} />
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════
@@ -788,17 +954,18 @@ export function SettingsManagement() {
               {[
                 { key: 'newMembers', label: 'Nouveaux membres', desc: 'Notifié lors de chaque nouvelle inscription de membre' },
                 { key: 'events', label: 'Événements', desc: 'Rappels avant les événements et cultes programmés' },
-                { key: 'finances', label: 'Finances', desc: 'Alertes de transactions, seuils d\'alerte de caisse, validations' },
+                { key: 'finances', label: 'Finances', desc: "Alertes de transactions, seuils d'alerte de caisse, validations" },
                 { key: 'urgences', label: 'Urgences', desc: 'Notifications critiques : sécurité, accès, erreurs système' },
-              ].map(s => (
-                <div key={s.key} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+              ].map(opt => (
+                <div key={opt.key} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">{s.label}</p>
-                    <p className="text-xs text-slate-400">{s.desc}</p>
+                    <p className="text-sm font-medium text-slate-900">{opt.label}</p>
+                    <p className="text-xs text-slate-400">{opt.desc}</p>
                   </div>
                   <Switch
-                    checked={notifInt[s.key as keyof typeof notifInt]}
-                    onCheckedChange={v => setNotifInt(p => ({...p, [s.key]: v}))}
+                    disabled={!notifEdit}
+                    checked={notifInt[opt.key as keyof typeof notifInt]}
+                    onCheckedChange={v => notifEdit && setNotifInt(p => ({...p, [opt.key]: v}))}
                   />
                 </div>
               ))}
@@ -818,16 +985,14 @@ export function SettingsManagement() {
                     <Smartphone className="w-4 h-4 text-slate-500" />
                     <p className="text-sm font-medium text-slate-900">SMS</p>
                   </div>
-                  <Switch checked={notifExt.sms} onCheckedChange={v => setNotifExt(p => ({...p, sms: v}))} />
+                  <Switch disabled={!notifEdit} checked={notifExt.sms} onCheckedChange={v => notifEdit && setNotifExt(p => ({...p, sms: v}))} />
                 </div>
                 {notifExt.sms && (
                   <div className="space-y-2 pt-1">
                     <Label className="text-xs">Fournisseur SMS (API Key)</Label>
-                    <Input
-                      placeholder="Ex: Twilio, Orange SMS API..."
-                      value={notifExt.smsProvider}
-                      onChange={e => setNotifExt(p => ({...p, smsProvider: e.target.value}))}
-                    />
+                    {notifEdit
+                      ? <Input placeholder="Ex: Twilio, Orange SMS API..." value={notifExt.smsProvider} onChange={e => setNotifExt(p => ({...p, smsProvider: e.target.value}))} />
+                      : <RO value={notifExt.smsProvider} placeholder="Non configuré" />}
                   </div>
                 )}
               </div>
@@ -840,7 +1005,7 @@ export function SettingsManagement() {
                     <p className="text-sm font-medium text-slate-900">WhatsApp Business</p>
                     <Badge className="bg-amber-100 text-amber-700 border-none text-xs">Bêta</Badge>
                   </div>
-                  <Switch checked={notifExt.whatsapp} onCheckedChange={v => setNotifExt(p => ({...p, whatsapp: v}))} />
+                  <Switch disabled={!notifEdit} checked={notifExt.whatsapp} onCheckedChange={v => notifEdit && setNotifExt(p => ({...p, whatsapp: v}))} />
                 </div>
               </div>
 
@@ -851,27 +1016,21 @@ export function SettingsManagement() {
                     <Mail className="w-4 h-4 text-blue-500" />
                     <p className="text-sm font-medium text-slate-900">Email</p>
                   </div>
-                  <Switch checked={notifExt.email} onCheckedChange={v => setNotifExt(p => ({...p, email: v}))} />
+                  <Switch disabled={!notifEdit} checked={notifExt.email} onCheckedChange={v => notifEdit && setNotifExt(p => ({...p, email: v}))} />
                 </div>
                 {notifExt.email && (
                   <div className="space-y-2 pt-1">
                     <Label className="text-xs">Serveur SMTP</Label>
-                    <Input
-                      placeholder="smtp.gmail.com"
-                      value={notifExt.smtpServer}
-                      onChange={e => setNotifExt(p => ({...p, smtpServer: e.target.value}))}
-                    />
+                    {notifEdit
+                      ? <Input placeholder="smtp.gmail.com" value={notifExt.smtpServer} onChange={e => setNotifExt(p => ({...p, smtpServer: e.target.value}))} />
+                      : <RO value={notifExt.smtpServer} placeholder="Non configuré" />}
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => save('Paramètres de notifications')}>
-              Enregistrer
-            </Button>
-          </div>
+          <SectionToolbar editing={notifEdit} onEdit={() => setNotifEdit(true)} onSave={saveNotif} onCancel={resetNotif} />
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════
@@ -894,33 +1053,31 @@ export function SettingsManagement() {
                   </p>
                   <p className="text-xs text-slate-400 mt-0.5">Sécurisez les connexions avec un code OTP par SMS ou email</p>
                 </div>
-                <Switch checked={secSettings.twoFactor} onCheckedChange={v => setSecSettings(p => ({...p, twoFactor: v}))} />
+                <Switch disabled={!secEdit} checked={secSettings.twoFactor} onCheckedChange={v => secEdit && setSecSettings(p => ({...p, twoFactor: v}))} />
               </div>
 
               <div className="space-y-2">
                 <Label>Tentatives de connexion avant blocage</Label>
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="number" min="1" max="20"
-                    value={secSettings.maxLoginAttempts}
-                    onChange={e => setSecSettings(p => ({...p, maxLoginAttempts: e.target.value}))}
-                    className="w-24"
-                  />
-                  <span className="text-sm text-slate-500">tentatives échouées avant blocage temporaire du compte</span>
-                </div>
+                {secEdit
+                  ? (
+                    <div className="flex items-center gap-3">
+                      <Input type="number" min="1" max="20" value={secSettings.maxLoginAttempts} onChange={e => setSecSettings(p => ({...p, maxLoginAttempts: e.target.value}))} className="w-24" />
+                      <span className="text-sm text-slate-500">tentatives échouées avant blocage temporaire</span>
+                    </div>
+                  )
+                  : <RO value={`${secSettings.maxLoginAttempts} tentatives`} />}
               </div>
 
               <div className="space-y-2">
                 <Label>Expiration de session (minutes d'inactivité)</Label>
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="number" min="5" max="1440"
-                    value={secSettings.sessionTimeout}
-                    onChange={e => setSecSettings(p => ({...p, sessionTimeout: e.target.value}))}
-                    className="w-24"
-                  />
-                  <span className="text-sm text-slate-500">minutes</span>
-                </div>
+                {secEdit
+                  ? (
+                    <div className="flex items-center gap-3">
+                      <Input type="number" min="5" max="1440" value={secSettings.sessionTimeout} onChange={e => setSecSettings(p => ({...p, sessionTimeout: e.target.value}))} className="w-24" />
+                      <span className="text-sm text-slate-500">minutes</span>
+                    </div>
+                  )
+                  : <RO value={`${secSettings.sessionTimeout} minutes`} />}
               </div>
             </CardContent>
           </Card>
@@ -930,8 +1087,9 @@ export function SettingsManagement() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Journal d'Activité</CardTitle>
                 <Switch
+                  disabled={!secEdit}
                   checked={secSettings.showActivityLog}
-                  onCheckedChange={v => setSecSettings(p => ({...p, showActivityLog: v}))}
+                  onCheckedChange={v => secEdit && setSecSettings(p => ({...p, showActivityLog: v}))}
                 />
               </div>
               <CardDescription>Historique des actions importantes effectuées sur la plateforme.</CardDescription>
@@ -979,11 +1137,7 @@ export function SettingsManagement() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => save('Paramètres de sécurité')}>
-              Enregistrer
-            </Button>
-          </div>
+          <SectionToolbar editing={secEdit} onEdit={() => setSecEdit(true)} onSave={saveSec} onCancel={resetSec} />
         </TabsContent>
 
         {/* ══════════════════════════════════════════════════════════
@@ -1003,40 +1157,38 @@ export function SettingsManagement() {
                   <p className="text-sm font-medium text-slate-900">Sauvegarde quotidienne</p>
                   <p className="text-xs text-slate-400">Sauvegarde automatique chaque jour à l'heure définie</p>
                 </div>
-                <Switch checked={backupSettings.dailyBackup} onCheckedChange={v => setBackupSettings(p => ({...p, dailyBackup: v}))} />
+                <Switch disabled={!backupEdit} checked={backupSettings.dailyBackup} onCheckedChange={v => backupEdit && setBackupSettings(p => ({...p, dailyBackup: v}))} />
               </div>
               <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100">
                 <div>
                   <p className="text-sm font-medium text-slate-900">Sauvegarde hebdomadaire</p>
                   <p className="text-xs text-slate-400">Sauvegarde complète chaque dimanche</p>
                 </div>
-                <Switch checked={backupSettings.weeklyBackup} onCheckedChange={v => setBackupSettings(p => ({...p, weeklyBackup: v}))} />
+                <Switch disabled={!backupEdit} checked={backupSettings.weeklyBackup} onCheckedChange={v => backupEdit && setBackupSettings(p => ({...p, weeklyBackup: v}))} />
               </div>
+
               <div className="space-y-2">
                 <Label>Heure de sauvegarde automatique</Label>
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="time"
-                    value={backupSettings.backupTime}
-                    onChange={e => setBackupSettings(p => ({...p, backupTime: e.target.value}))}
-                    className="w-36"
-                  />
-                  <span className="text-xs text-slate-400 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> Heure locale ({genForm.timezone.split('/')[1] || 'Abidjan'})
-                  </span>
-                </div>
+                {backupEdit
+                  ? (
+                    <div className="flex items-center gap-3">
+                      <Input type="time" value={backupSettings.backupTime} onChange={e => setBackupSettings(p => ({...p, backupTime: e.target.value}))} className="w-36" />
+                      <span className="text-xs text-slate-400 flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Heure locale</span>
+                    </div>
+                  )
+                  : <RO value={backupSettings.backupTime} />}
               </div>
+
               <div className="space-y-2">
                 <Label>Durée de rétention des archives</Label>
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="number" min="1" max="60"
-                    value={backupSettings.retentionMonths}
-                    onChange={e => setBackupSettings(p => ({...p, retentionMonths: e.target.value}))}
-                    className="w-24"
-                  />
-                  <span className="text-sm text-slate-500">mois avant suppression automatique des anciennes sauvegardes</span>
-                </div>
+                {backupEdit
+                  ? (
+                    <div className="flex items-center gap-3">
+                      <Input type="number" min="1" max="60" value={backupSettings.retentionMonths} onChange={e => setBackupSettings(p => ({...p, retentionMonths: e.target.value}))} className="w-24" />
+                      <span className="text-sm text-slate-500">mois avant suppression automatique</span>
+                    </div>
+                  )
+                  : <RO value={`${backupSettings.retentionMonths} mois`} />}
               </div>
             </CardContent>
           </Card>
@@ -1116,11 +1268,7 @@ export function SettingsManagement() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end">
-            <Button className="bg-church-gold hover:bg-church-gold/90 text-white px-8" onClick={() => save('Paramètres de sauvegarde')}>
-              Enregistrer
-            </Button>
-          </div>
+          <SectionToolbar editing={backupEdit} onEdit={() => setBackupEdit(true)} onSave={saveBackup} onCancel={resetBackup} />
         </TabsContent>
       </Tabs>
     </div>

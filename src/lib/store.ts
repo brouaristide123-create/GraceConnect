@@ -37,6 +37,113 @@ export interface ChurchStats {
   children: { m: number; f: number };
 }
 
+// ── Church-level settings (persisted in Zustand) ─────────────────────────────
+export interface ChurchSettings {
+  // Général
+  slogan: string;
+  primaryColor: string;
+  theme: 'clair' | 'sombre' | 'auto';
+  timezone: string;
+  // Finance
+  currency: string;
+  fiscalMonth: string;
+  mobileMoneyOrange: boolean;
+  mobileMoneyMTN: boolean;
+  mobileMoneyWave: boolean;
+  autoReceipt: boolean;
+  receiptEmail: boolean;
+  receiptWhatsapp: boolean;
+  // Membres
+  matriculeFormat: string;
+  archiveAfterMonths: string;
+  photoRequired: boolean;
+  birthDateRequired: boolean;
+  phoneRequired: boolean;
+  groupByDepartment: boolean;
+  // Documents
+  baptismCert: boolean;
+  marriageCert: boolean;
+  trainingCert: boolean;
+  logoOnDocs: boolean;
+  signatureEnabled: boolean;
+  headerText: string;
+  footerText: string;
+  // Notifications internes
+  notifNewMembers: boolean;
+  notifEvents: boolean;
+  notifFinances: boolean;
+  notifUrgences: boolean;
+  // Notifications externes
+  notifSms: boolean;
+  notifSmsProvider: string;
+  notifWhatsapp: boolean;
+  notifEmail: boolean;
+  notifSmtpServer: string;
+  // Sécurité
+  twoFactor: boolean;
+  maxLoginAttempts: string;
+  sessionTimeout: string;
+  showActivityLog: boolean;
+  // Sauvegarde
+  dailyBackup: boolean;
+  weeklyBackup: boolean;
+  backupTime: string;
+  autoExportPDF: boolean;
+  autoExportExcel: boolean;
+  retentionMonths: string;
+  // Rôles permissions (serialisées en JSON)
+  rolePerms: Record<string, Record<string, boolean>>;
+}
+
+export const DEFAULT_CHURCH_SETTINGS: ChurchSettings = {
+  slogan: 'Grandir ensemble dans la foi',
+  primaryColor: '#10b981',
+  theme: 'clair',
+  timezone: 'Africa/Abidjan',
+  currency: 'XOF',
+  fiscalMonth: '1',
+  mobileMoneyOrange: true,
+  mobileMoneyMTN: true,
+  mobileMoneyWave: false,
+  autoReceipt: true,
+  receiptEmail: false,
+  receiptWhatsapp: false,
+  matriculeFormat: 'MBR-{YEAR}-{SEQ}',
+  archiveAfterMonths: '12',
+  photoRequired: false,
+  birthDateRequired: true,
+  phoneRequired: true,
+  groupByDepartment: true,
+  baptismCert: true,
+  marriageCert: true,
+  trainingCert: true,
+  logoOnDocs: true,
+  signatureEnabled: false,
+  headerText: 'Église de Grâce — Abidjan',
+  footerText: 'Document officiel — Ne pas modifier',
+  notifNewMembers: true,
+  notifEvents: true,
+  notifFinances: true,
+  notifUrgences: true,
+  notifSms: false,
+  notifSmsProvider: '',
+  notifWhatsapp: false,
+  notifEmail: true,
+  notifSmtpServer: 'smtp.gmail.com',
+  twoFactor: false,
+  maxLoginAttempts: '5',
+  sessionTimeout: '60',
+  showActivityLog: true,
+  dailyBackup: true,
+  weeklyBackup: true,
+  backupTime: '02:00',
+  autoExportPDF: false,
+  autoExportExcel: false,
+  retentionMonths: '6',
+  rolePerms: {},
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface Church {
   id: string;
   name: string;
@@ -1196,6 +1303,10 @@ interface AppState {
   addWedding: (wedding: Omit<Wedding, 'id' | 'createdAt'>) => void;
   updateWedding: (id: string, wedding: Partial<Wedding>) => void;
   deleteWedding: (id: string) => void;
+
+  // ── Paramètres de l'église ────────────────────────────────────────────────
+  churchSettings: ChurchSettings;
+  updateChurchSettings: (settings: Partial<ChurchSettings>) => void;
 }
 
 export interface Announcement {
@@ -1694,6 +1805,7 @@ export const useStore = create<AppState>()(
       eventOrders: [],
       cashRegisters: [],
       cashTransactions: [],
+      churchSettings: { ...DEFAULT_CHURCH_SETTINGS },
       transactions: [
         { id: '1', type: 'tithe', amount: 50000, category: 'Dîmes', churchId: '1', memberId: '1', date: '2026-04-05', paymentMethod: 'Cash' },
         { id: '2', type: 'offering', amount: 150000, category: 'Offrandes', churchId: '1', date: '2026-04-05', paymentMethod: 'Cash' },
@@ -2590,6 +2702,11 @@ export const useStore = create<AppState>()(
       })),
       deleteWedding: (id) => set((state) => ({
         weddings: state.weddings.filter((w) => w.id !== id)
+      })),
+
+      // ── Paramètres de l'église ──────────────────────────────────────────────
+      updateChurchSettings: (settings) => set((state) => ({
+        churchSettings: { ...(state.churchSettings ?? DEFAULT_CHURCH_SETTINGS), ...settings }
       })),
     }),
     {
