@@ -2097,13 +2097,13 @@ export const useStore = create<AppState>()(
       })),
 
       addCashRegister: (register) => set((state) => ({
-        cashRegisters: [...state.cashRegisters, { ...register, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+        cashRegisters: [...(state.cashRegisters ?? []), { ...register, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
       })),
       updateCashRegister: (id, register) => set((state) => ({
-        cashRegisters: state.cashRegisters.map((r) => (r.id === id ? { ...r, ...register } : r))
+        cashRegisters: (state.cashRegisters ?? []).map((r) => (r.id === id ? { ...r, ...register } : r))
       })),
       deleteCashRegister: (id) => set((state) => ({
-        cashRegisters: state.cashRegisters.filter((r) => r.id !== id)
+        cashRegisters: (state.cashRegisters ?? []).filter((r) => r.id !== id)
       })),
       addCashTransaction: (transaction) => set((state) => {
         const INCOME_TYPES = ['income', 'donation', 'offering', 'tithe', 'contribution', 'event_payment', 'transfer_in'];
@@ -2113,12 +2113,12 @@ export const useStore = create<AppState>()(
           : EXPENSE_TYPES.includes(transaction.type)
             ? -transaction.amount
             : 0;
-        const reg = state.cashRegisters.find(r => r.id === transaction.registerId);
+        const reg = (state.cashRegisters ?? []).find(r => r.id === transaction.registerId);
         return {
-          cashTransactions: [...state.cashTransactions, { ...transaction, id: crypto.randomUUID() }],
+          cashTransactions: [...(state.cashTransactions ?? []), { ...transaction, id: crypto.randomUUID() }],
           cashRegisters: reg
-            ? state.cashRegisters.map(r => r.id === transaction.registerId ? { ...r, balance: r.balance + delta } : r)
-            : state.cashRegisters
+            ? (state.cashRegisters ?? []).map(r => r.id === transaction.registerId ? { ...r, balance: r.balance + delta } : r)
+            : (state.cashRegisters ?? [])
         };
       }),
 

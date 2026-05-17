@@ -134,28 +134,35 @@ export function CreateRegisterDialog({ open, onClose, register }: CreateRegister
   function handleSubmit() {
     try {
       if (!form.name.trim()) { toast.error('Le nom est obligatoire'); return; }
-      const initBal = Number(form.initialBalance) || 0;
-      const payload: Omit<CashRegister, 'id' | 'createdAt'> = {
+
+      const initBal = parseFloat(form.initialBalance) || 0;
+      const threshold = form.alertThreshold ? parseFloat(form.alertThreshold) : undefined;
+      const newBalance = register
+        ? (register.balance + (initBal - (register.initialBalance ?? 0)))
+        : initBal;
+
+      const payload = {
         name: form.name.trim(),
-        description: form.description.trim() || undefined,
-        churchId,
+        description: form.description.trim() !== '' ? form.description.trim() : undefined,
+        churchId: churchId || '',
         type: form.regType,
         typeCustom: form.regType === 'autre' ? form.typeCustom : undefined,
         cashierId: form.cashierId !== NONE ? form.cashierId : undefined,
-        cashierName: form.cashierName || undefined,
+        cashierName: form.cashierName !== '' ? form.cashierName : undefined,
         responsibleId: form.responsibleId !== NONE ? form.responsibleId : undefined,
-        responsibleName: form.responsibleName || undefined,
+        responsibleName: form.responsibleName !== '' ? form.responsibleName : undefined,
         initialBalance: initBal,
-        balance: register ? (register.balance + (initBal - (register.initialBalance ?? 0))) : initBal,
-        isActive: form.isActive,
-        allowExpenses: form.allowExpenses,
-        allowExternalContributions: form.allowExternalContributions,
+        balance: newBalance,
+        isActive: Boolean(form.isActive),
+        allowExpenses: Boolean(form.allowExpenses),
+        allowExternalContributions: Boolean(form.allowExternalContributions),
         color: form.color,
-        alertThreshold: form.alertThreshold ? Number(form.alertThreshold) : undefined,
-        linkedTo: form.linkedType !== 'general' && form.linkedId !== NONE
-          ? { type: form.linkedType, id: form.linkedId, name: form.linkedName || undefined }
+        alertThreshold: threshold,
+        linkedTo: (form.linkedType !== 'general' && form.linkedId !== NONE)
+          ? { type: form.linkedType as 'event' | 'service' | 'general' | 'department', id: form.linkedId, name: form.linkedName !== '' ? form.linkedName : undefined }
           : undefined,
       };
+
       if (register) {
         updateCashRegister(register.id, payload);
         toast.success('Caisse mise à jour avec succès');
@@ -165,8 +172,9 @@ export function CreateRegisterDialog({ open, onClose, register }: CreateRegister
       }
       onClose();
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       console.error('Erreur création caisse:', err);
-      toast.error('Une erreur est survenue. Veuillez réessayer.');
+      toast.error(`Erreur: ${msg}`);
     }
   }
 
