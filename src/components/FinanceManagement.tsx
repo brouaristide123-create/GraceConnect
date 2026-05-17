@@ -90,6 +90,22 @@ import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 
+// ── Label maps to avoid Base UI SelectValue showing raw English keys ──
+const TX_TYPE_FR: Record<string, string> = {
+  tithe: 'Dîme', offering: 'Offrande', donation: 'Don', expense: 'Dépense',
+  income: 'Entrée', transfer: 'Virement',
+};
+const PERIOD_FR: Record<string, string> = {
+  '3m': '3 Mois', '6m': '6 Mois', '1y': '1 An',
+};
+const LINKED_TYPE_FR: Record<string, string> = {
+  general: 'Général', event: 'Événement', service: 'Culte',
+};
+const PAYMENT_FR: Record<string, string> = {
+  Cash: 'Espèces', 'Mobile Money': 'Mobile Money', Bank: 'Virement Bancaire',
+  Wave: 'Wave', Djamo: 'Djamo',
+};
+
 const transactionSchema = z.object({
   type: z.enum(['tithe', 'offering', 'donation', 'expense']),
   amount: z.coerce.number().min(0, "Le montant doit être positif"),
@@ -117,6 +133,7 @@ export function FinanceManagement() {
   const [isAIAssistanceEnabled, setIsAIAssistanceEnabled] = React.useState(true);
   const [showAIAssistConfirm, setShowAIAssistConfirm] = React.useState(false);
   const [pendingAIAssistToggle, setPendingAIAssistToggle] = React.useState(false);
+  const [chartPeriod, setChartPeriod] = React.useState('6m');
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema) as any,
@@ -266,7 +283,7 @@ export function FinanceManagement() {
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Type" />
+                                <span className="text-sm">{TX_TYPE_FR[field.value] || 'Type'}</span>
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -317,7 +334,7 @@ export function FinanceManagement() {
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Mode" />
+                                <span className="text-sm">{PAYMENT_FR[field.value] || field.value || 'Mode'}</span>
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -568,9 +585,9 @@ export function FinanceManagement() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Select defaultValue="6m">
+                <Select value={chartPeriod} onValueChange={setChartPeriod}>
                   <SelectTrigger className="w-28 h-8 text-xs">
-                    <SelectValue placeholder="Période" />
+                    <span className="text-xs">{PERIOD_FR[chartPeriod] || chartPeriod}</span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="3m">3 Mois</SelectItem>
@@ -1098,7 +1115,9 @@ export function FinanceManagement() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase text-slate-500">Liée à</label>
                   <Select value={caisseForm.linkedType} onValueChange={(v: any) => setCaisseForm(f => ({...f, linkedType: v, linkedId: ''}))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <span className="text-sm">{LINKED_TYPE_FR[caisseForm.linkedType] || caisseForm.linkedType}</span>
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="general">Général</SelectItem>
                       <SelectItem value="event">Événement</SelectItem>
@@ -1171,7 +1190,9 @@ export function FinanceManagement() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase text-slate-500">Type</label>
                   <Select value={txForm.type} onValueChange={(v: any) => setTxForm(f => ({...f, type: v}))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <span className="text-sm">{TX_TYPE_FR[txForm.type] || txForm.type}</span>
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="income">Entrée</SelectItem>
                       <SelectItem value="expense">Dépense</SelectItem>
@@ -1197,9 +1218,11 @@ export function FinanceManagement() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase text-slate-500">Méthode de paiement</label>
                   <Select value={txForm.paymentMethod} onValueChange={(v: any) => setTxForm(f => ({...f, paymentMethod: v}))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <span className="text-sm">{PAYMENT_FR[txForm.paymentMethod] || txForm.paymentMethod}</span>
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Cash">Espèces</SelectItem>
                       <SelectItem value="Mobile Money">Mobile Money</SelectItem>
                       <SelectItem value="Bank">Virement bancaire</SelectItem>
                       <SelectItem value="Wave">Wave</SelectItem>
