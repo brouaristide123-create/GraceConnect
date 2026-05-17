@@ -16,7 +16,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { cn } from '../lib/utils';
+import { cn, generateId } from '../lib/utils';
 import { toast } from 'sonner';
 
 // ═══════════════════════════════════════════════════════════════
@@ -328,7 +328,7 @@ export function SuiviSpirituelManagement() {
     }
     const member = activeMembers.find(m => m.id === caseForm.memberId);
     const newCase: SuiviCase = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       memberId: caseForm.memberId,
       memberName: `${member?.firstName} ${member?.lastName}`,
       matricule: member?.matricule || '',
@@ -361,7 +361,7 @@ export function SuiviSpirituelManagement() {
       return;
     }
     const visit: CaseVisit = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       date: visitForm.date,
       responsibleName: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Responsable',
       type: visitForm.type,
@@ -394,7 +394,7 @@ export function SuiviSpirituelManagement() {
     }
     const member = activeMembers.find(m => m.id === prayerForm.memberId);
     const newPrayer: PrayerRequest = {
-      id: crypto.randomUUID(), memberId: prayerForm.memberId,
+      id: generateId(), memberId: prayerForm.memberId,
       memberName: prayerForm.isAnonymous ? 'Membre anonyme' : `${member?.firstName} ${member?.lastName}`,
       title: prayerForm.title, description: prayerForm.description,
       status: 'active', confidentiality: prayerForm.confidentiality,
@@ -414,7 +414,7 @@ export function SuiviSpirituelManagement() {
     }
     const member = activeMembers.find(m => m.id === counselingForm.memberId);
     const newSession: CounselingSession = {
-      id: crypto.randomUUID(), memberId: counselingForm.memberId,
+      id: generateId(), memberId: counselingForm.memberId,
       memberName: `${member?.firstName} ${member?.lastName}`,
       date: counselingForm.date, topic: counselingForm.topic,
       counselorName: counselingForm.counselorName, status: 'planifie',

@@ -62,7 +62,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from './ui/select';
-import { cn } from '../lib/utils';
+import { cn, generateId } from '../lib/utils';
 import { Progress } from './ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Checkbox } from './ui/checkbox';
@@ -227,7 +227,7 @@ export function DepartmentManagement() {
 
   const onAddDept = (values: z.infer<typeof deptSchema>) => {
     const { initialMembers, ...deptData } = values;
-    const newDeptId = crypto.randomUUID();
+    const newDeptId = generateId();
     
     // Create the department
     addDepartment({ 

@@ -1,6 +1,28 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+// ── UUID polyfill ─────────────────────────────────────────────────────────────
+// crypto.randomUUID() exige HTTPS. Ce polyfill fonctionne aussi en HTTP.
+function generateId(): string {
+  if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
+    return (crypto as any).randomUUID();
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface ChurchOfficial {
   id: string;
   name: string;
@@ -1866,7 +1888,7 @@ export const useStore = create<AppState>()(
 
         const newChurches = [...state.churches, {
           ...church,
-          id: crypto.randomUUID(),
+          id: generateId(),
           code,
           createdAt: new Date().toISOString()
         }];
@@ -1930,7 +1952,7 @@ export const useStore = create<AppState>()(
         return {
           members: [...state.members, {
             ...member,
-            id: crypto.randomUUID(),
+            id: generateId(),
             matricule,
             joinedAt: new Date().toISOString()
           }]
@@ -1955,7 +1977,7 @@ export const useStore = create<AppState>()(
         return {
           children: [...state.children, {
             ...child,
-            id: crypto.randomUUID(),
+            id: generateId(),
             matricule,
             joinedAt: new Date().toISOString()
           }]
@@ -1969,7 +1991,7 @@ export const useStore = create<AppState>()(
       })),
 
       addDepartment: (dept) => set((state) => ({
-        departments: [...state.departments, { id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...dept }]
+        departments: [...state.departments, { id: generateId(), createdAt: new Date().toISOString(), ...dept }]
       })),
       updateDepartment: (id, dept) => set((state) => ({
         departments: state.departments.map((d) => (d.id === id ? { ...d, ...dept } : d))
@@ -1979,7 +2001,7 @@ export const useStore = create<AppState>()(
       })),
 
       addDeptMember: (dm) => set((state) => ({
-        departmentMembers: [...state.departmentMembers, { ...dm, id: crypto.randomUUID(), joinedAt: new Date().toISOString() }]
+        departmentMembers: [...state.departmentMembers, { ...dm, id: generateId(), joinedAt: new Date().toISOString() }]
       })),
       updateDeptMember: (id, dm) => set((state) => ({
         departmentMembers: state.departmentMembers.map((m) => (m.id === id ? { ...m, ...dm } : m))
@@ -1989,7 +2011,7 @@ export const useStore = create<AppState>()(
       })),
 
       addDeptActivity: (activity) => set((state) => ({
-        departmentActivities: [...state.departmentActivities, { ...activity, id: crypto.randomUUID(), attendance: [] }]
+        departmentActivities: [...state.departmentActivities, { ...activity, id: generateId(), attendance: [] }]
       })),
       updateDeptActivity: (id, activity) => set((state) => ({
         departmentActivities: state.departmentActivities.map((a) => (a.id === id ? { ...a, ...activity } : a))
@@ -1998,14 +2020,14 @@ export const useStore = create<AppState>()(
         departmentActivities: state.departmentActivities.filter((a) => a.id !== id)
       })),
       addDeptGoal: (goal) => set((state) => ({
-        departmentGoals: [...state.departmentGoals, { ...goal, id: crypto.randomUUID() }]
+        departmentGoals: [...state.departmentGoals, { ...goal, id: generateId() }]
       })),
       updateDeptGoal: (id, goal) => set((state) => ({
         departmentGoals: state.departmentGoals.map((g) => (g.id === id ? { ...g, ...goal } : g))
       })),
 
       addService: (service) => set((state) => ({
-        services: [...state.services, { ...service, id: crypto.randomUUID() }]
+        services: [...state.services, { ...service, id: generateId() }]
       })),
       updateService: (id, service) => set((state) => ({
         services: state.services.map((s) => (s.id === id ? { ...s, ...service } : s))
@@ -2015,7 +2037,7 @@ export const useStore = create<AppState>()(
       })),
 
       addServiceProgramItem: (item) => set((state) => ({
-        servicePrograms: [...state.servicePrograms, { ...item, id: crypto.randomUUID() }]
+        servicePrograms: [...state.servicePrograms, { ...item, id: generateId() }]
       })),
       updateServiceProgramItem: (id, item) => set((state) => ({
         servicePrograms: state.servicePrograms.map((p) => (p.id === id ? { ...p, ...item } : p))
@@ -2025,18 +2047,18 @@ export const useStore = create<AppState>()(
       })),
 
       addVisitor: (visitor) => set((state) => ({
-        visitors: [...state.visitors, { ...visitor, id: crypto.randomUUID() }]
+        visitors: [...state.visitors, { ...visitor, id: generateId() }]
       })),
       updateVisitor: (id, visitor) => set((state) => ({
         visitors: state.visitors.map((v) => (v.id === id ? { ...v, ...visitor } : v))
       })),
 
       addServiceFinance: (finance) => set((state) => ({
-        serviceFinances: [...state.serviceFinances, { ...finance, id: crypto.randomUUID() }]
+        serviceFinances: [...state.serviceFinances, { ...finance, id: generateId() }]
       })),
 
       addEvent: (event) => set((state) => ({
-        events: [...state.events, { ...event, id: crypto.randomUUID() }]
+        events: [...state.events, { ...event, id: generateId() }]
       })),
       updateEvent: (id, event) => set((state) => ({
         events: state.events.map((e) => (e.id === id ? { ...e, ...event } : e))
@@ -2046,14 +2068,14 @@ export const useStore = create<AppState>()(
       })),
 
       addEventRegistration: (reg) => set((state) => ({
-        eventRegistrations: [...state.eventRegistrations, { ...reg, id: crypto.randomUUID() }]
+        eventRegistrations: [...state.eventRegistrations, { ...reg, id: generateId() }]
       })),
       updateEventRegistration: (id, reg) => set((state) => ({
         eventRegistrations: state.eventRegistrations.map((r) => (r.id === id ? { ...r, ...reg } : r))
       })),
 
       addEventOrder: (order) => set((state) => ({
-        eventOrders: [...state.eventOrders, { ...order, id: crypto.randomUUID(), orderedAt: new Date().toISOString() }]
+        eventOrders: [...state.eventOrders, { ...order, id: generateId(), orderedAt: new Date().toISOString() }]
       })),
       updateEventOrder: (id, order) => set((state) => ({
         eventOrders: state.eventOrders.map((o) => (o.id === id ? { ...o, ...order } : o))
@@ -2063,7 +2085,7 @@ export const useStore = create<AppState>()(
       })),
 
       addEventTeam: (team) => set((state) => ({
-        eventTeams: [...state.eventTeams, { ...team, id: crypto.randomUUID() }]
+        eventTeams: [...state.eventTeams, { ...team, id: generateId() }]
       })),
       updateEventTeam: (id, team) => set((state) => ({
         eventTeams: state.eventTeams.map((t) => (t.id === id ? { ...t, ...team } : t))
@@ -2073,14 +2095,14 @@ export const useStore = create<AppState>()(
       })),
 
       addPastoralNote: (note) => set((state) => ({
-        pastoralNotes: [...state.pastoralNotes, { ...note, id: crypto.randomUUID() }]
+        pastoralNotes: [...state.pastoralNotes, { ...note, id: generateId() }]
       })),
       deletePastoralNote: (id) => set((state) => ({
         pastoralNotes: state.pastoralNotes.filter((n) => n.id !== id)
       })),
 
       addTraining: (training) => set((state) => ({
-        trainings: [...state.trainings, { ...training, id: crypto.randomUUID() }]
+        trainings: [...state.trainings, { ...training, id: generateId() }]
       })),
       updateTraining: (id, training) => set((state) => ({
         trainings: state.trainings.map((t) => (t.id === id ? { ...t, ...training } : t))
@@ -2090,14 +2112,14 @@ export const useStore = create<AppState>()(
       })),
       
       addTransaction: (transaction) => set((state) => ({
-        transactions: [...state.transactions, { ...transaction, id: crypto.randomUUID() }]
+        transactions: [...state.transactions, { ...transaction, id: generateId() }]
       })),
       addAttendance: (attendance) => set((state) => ({
-        attendance: [...state.attendance, { ...attendance, id: crypto.randomUUID() }]
+        attendance: [...state.attendance, { ...attendance, id: generateId() }]
       })),
 
       addCashRegister: (register) => set((state) => ({
-        cashRegisters: [...(state.cashRegisters ?? []), { ...register, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+        cashRegisters: [...(state.cashRegisters ?? []), { ...register, id: generateId(), createdAt: new Date().toISOString() }]
       })),
       updateCashRegister: (id, register) => set((state) => ({
         cashRegisters: (state.cashRegisters ?? []).map((r) => (r.id === id ? { ...r, ...register } : r))
@@ -2115,7 +2137,7 @@ export const useStore = create<AppState>()(
             : 0;
         const reg = (state.cashRegisters ?? []).find(r => r.id === transaction.registerId);
         return {
-          cashTransactions: [...(state.cashTransactions ?? []), { ...transaction, id: crypto.randomUUID() }],
+          cashTransactions: [...(state.cashTransactions ?? []), { ...transaction, id: generateId() }],
           cashRegisters: reg
             ? (state.cashRegisters ?? []).map(r => r.id === transaction.registerId ? { ...r, balance: r.balance + delta } : r)
             : (state.cashRegisters ?? [])
@@ -2124,8 +2146,8 @@ export const useStore = create<AppState>()(
 
       transferBetweenRegisters: (fromId, toId, amount, motif, authorId, authorName) => set((state) => {
         const now = new Date().toISOString();
-        const txId1 = crypto.randomUUID();
-        const txId2 = crypto.randomUUID();
+        const txId1 = generateId();
+        const txId2 = generateId();
         const outTx: CashTransaction = {
           id: txId1,
           registerId: fromId,
@@ -2185,14 +2207,14 @@ export const useStore = create<AppState>()(
       }),
 
       addChildCheckIn: (checkIn) => set((state) => ({
-        childCheckIns: [...state.childCheckIns, { ...checkIn, id: crypto.randomUUID() }]
+        childCheckIns: [...state.childCheckIns, { ...checkIn, id: generateId() }]
       })),
       updateChildCheckIn: (id, checkIn) => set((state) => ({
         childCheckIns: state.childCheckIns.map((c) => (c.id === id ? { ...c, ...checkIn } : c))
       })),
 
       addChildClass: (childClass) => set((state) => ({
-        childClasses: [...state.childClasses, { ...childClass, id: crypto.randomUUID() }]
+        childClasses: [...state.childClasses, { ...childClass, id: generateId() }]
       })),
       updateChildClass: (id, childClass) => set((state) => ({
         childClasses: state.childClasses.map((c) => (c.id === id ? { ...c, ...childClass } : c))
@@ -2202,11 +2224,11 @@ export const useStore = create<AppState>()(
       })),
 
       addChildLesson: (lesson) => set((state) => ({
-        childLessons: [...state.childLessons, { ...lesson, id: crypto.randomUUID() }]
+        childLessons: [...state.childLessons, { ...lesson, id: generateId() }]
       })),
 
       addChildReport: (report) => set((state) => ({
-        childReports: [...state.childReports, { ...report, id: crypto.randomUUID() }]
+        childReports: [...state.childReports, { ...report, id: generateId() }]
       })),
 
       updateChildPoints: (id, points) => set((state) => ({
@@ -2217,7 +2239,7 @@ export const useStore = create<AppState>()(
       })),
 
       addContributionType: (type) => set((state) => ({
-        contributionTypes: [...state.contributionTypes, { ...type, id: crypto.randomUUID() }]
+        contributionTypes: [...state.contributionTypes, { ...type, id: generateId() }]
       })),
       updateContributionType: (id, type) => set((state) => ({
         contributionTypes: state.contributionTypes.map((t) => (t.id === id ? { ...t, ...type } : t))
@@ -2227,44 +2249,44 @@ export const useStore = create<AppState>()(
       })),
 
       addContributionPayment: (payment) => set((state) => ({
-        contributionPayments: [...state.contributionPayments, { ...payment, id: crypto.randomUUID() }]
+        contributionPayments: [...state.contributionPayments, { ...payment, id: generateId() }]
       })),
       updateContributionPayment: (id, payment) => set((state) => ({
         contributionPayments: state.contributionPayments.map((p) => (p.id === id ? { ...p, ...payment } : p))
       })),
 
       addContributionGoal: (goal) => set((state) => ({
-        contributionGoals: [...state.contributionGoals, { ...goal, id: crypto.randomUUID() }]
+        contributionGoals: [...state.contributionGoals, { ...goal, id: generateId() }]
       })),
       updateContributionGoal: (id, goal) => set((state) => ({
         contributionGoals: state.contributionGoals.map((g) => (g.id === id ? { ...g, ...goal } : g))
       })),
 
       addFuneralCase: (fCase) => set((state) => ({
-        funeralCases: [...state.funeralCases, { ...fCase, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+        funeralCases: [...state.funeralCases, { ...fCase, id: generateId(), createdAt: new Date().toISOString() }]
       })),
       updateFuneralCase: (id, fCase) => set((state) => ({
         funeralCases: state.funeralCases.map((c) => (c.id === id ? { ...c, ...fCase } : c))
       })),
 
       addFuneralContribution: (contribution) => set((state) => ({
-        funeralContributions: [...state.funeralContributions, { ...contribution, id: crypto.randomUUID() }]
+        funeralContributions: [...state.funeralContributions, { ...contribution, id: generateId() }]
       })),
       addFuneralExpense: (expense) => set((state) => ({
-        funeralExpenses: [...state.funeralExpenses, { ...expense, id: crypto.randomUUID() }]
+        funeralExpenses: [...state.funeralExpenses, { ...expense, id: generateId() }]
       })),
       addFuneralTask: (task) => set((state) => ({
-        funeralTasks: [...state.funeralTasks, { ...task, id: crypto.randomUUID() }]
+        funeralTasks: [...state.funeralTasks, { ...task, id: generateId() }]
       })),
       updateFuneralTask: (id, task) => set((state) => ({
         funeralTasks: state.funeralTasks.map((t) => (t.id === id ? { ...t, ...task } : t))
       })),
       addFuneralMessage: (message) => set((state) => ({
-        funeralMessages: [...state.funeralMessages, { ...message, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+        funeralMessages: [...state.funeralMessages, { ...message, id: generateId(), createdAt: new Date().toISOString() }]
       })),
 
       addChurchProject: (project) => set((state) => ({
-        churchProjects: [...state.churchProjects, { ...project, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+        churchProjects: [...state.churchProjects, { ...project, id: generateId(), createdAt: new Date().toISOString() }]
       })),
       updateChurchProject: (id, project) => set((state) => ({
         churchProjects: state.churchProjects.map((p) => (p.id === id ? { ...p, ...project } : p))
@@ -2274,23 +2296,23 @@ export const useStore = create<AppState>()(
       })),
 
       addProjectContribution: (contribution) => set((state) => ({
-        projectContributions: [...state.projectContributions, { ...contribution, id: crypto.randomUUID() }]
+        projectContributions: [...state.projectContributions, { ...contribution, id: generateId() }]
       })),
       addProjectExpense: (expense) => set((state) => ({
-        projectExpenses: [...state.projectExpenses, { ...expense, id: crypto.randomUUID() }]
+        projectExpenses: [...state.projectExpenses, { ...expense, id: generateId() }]
       })),
       addProjectStep: (step) => set((state) => ({
-        projectSteps: [...state.projectSteps, { ...step, id: crypto.randomUUID() }]
+        projectSteps: [...state.projectSteps, { ...step, id: generateId() }]
       })),
       updateProjectStep: (id, step) => set((state) => ({
         projectSteps: state.projectSteps.map((s) => (s.id === id ? { ...s, ...step } : s))
       })),
       addProjectMedia: (media) => set((state) => ({
-        projectMedia: [...state.projectMedia, { ...media, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+        projectMedia: [...state.projectMedia, { ...media, id: generateId(), createdAt: new Date().toISOString() }]
       })),
 
       addAssignment: (assignment) => set((state) => ({
-        assignments: [...state.assignments, { ...assignment, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+        assignments: [...state.assignments, { ...assignment, id: generateId(), createdAt: new Date().toISOString() }]
       })),
       updateAssignment: (id, assignment) => set((state) => ({
         assignments: state.assignments.map((a) => (a.id === id ? { ...a, ...assignment } : a))
@@ -2300,7 +2322,7 @@ export const useStore = create<AppState>()(
       })),
 
       addAssignmentMember: (am) => set((state) => ({
-        assignmentMembers: [...state.assignmentMembers, { ...am, id: crypto.randomUUID() }]
+        assignmentMembers: [...state.assignmentMembers, { ...am, id: generateId() }]
       })),
       updateAssignmentMember: (id, am) => set((state) => ({
         assignmentMembers: state.assignmentMembers.map((m) => (m.id === id ? { ...m, ...am } : m))
@@ -2317,12 +2339,12 @@ export const useStore = create<AppState>()(
           };
         }
         return {
-          memberAvailabilities: [...state.memberAvailabilities, { ...availability, id: crypto.randomUUID() }]
+          memberAvailabilities: [...state.memberAvailabilities, { ...availability, id: generateId() }]
         };
       }),
 
       addCourse: (course) => set((state) => ({
-        courses: [...state.courses, { ...course, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+        courses: [...state.courses, { ...course, id: generateId(), createdAt: new Date().toISOString() }]
       })),
       updateCourse: (id, course) => set((state) => ({
         courses: state.courses.map((c) => (c.id === id ? { ...c, ...course } : c))
@@ -2332,7 +2354,7 @@ export const useStore = create<AppState>()(
       })),
 
       addCourseModule: (module) => set((state) => ({
-        courseModules: [...state.courseModules, { ...module, id: crypto.randomUUID() }]
+        courseModules: [...state.courseModules, { ...module, id: generateId() }]
       })),
       updateCourseModule: (id, module) => set((state) => ({
         courseModules: state.courseModules.map(m => m.id === id ? { ...m, ...module } : m)
@@ -2342,7 +2364,7 @@ export const useStore = create<AppState>()(
         courseLessons: state.courseLessons.filter(l => l.moduleId !== id)
       })),
       addCourseLesson: (lesson) => set((state) => ({
-        courseLessons: [...state.courseLessons, { ...lesson, id: crypto.randomUUID() }]
+        courseLessons: [...state.courseLessons, { ...lesson, id: generateId() }]
       })),
       updateCourseLesson: (id, lesson) => set((state) => ({
         courseLessons: state.courseLessons.map(l => l.id === id ? { ...l, ...lesson } : l)
@@ -2353,7 +2375,7 @@ export const useStore = create<AppState>()(
 
       enrollMember: (courseId, memberId) => set((state) => ({
         courseEnrollments: [...state.courseEnrollments, {
-          id: crypto.randomUUID(),
+          id: generateId(),
           courseId,
           memberId,
           progress: 0,
@@ -2391,28 +2413,28 @@ export const useStore = create<AppState>()(
       })),
 
       addCourseQuiz: (quiz) => set((state) => ({
-        courseQuizzes: [...state.courseQuizzes, { ...quiz, id: crypto.randomUUID() }]
+        courseQuizzes: [...state.courseQuizzes, { ...quiz, id: generateId() }]
       })),
       addCourseResource: (resource) => set((state) => ({
-        courseResources: [...state.courseResources, { ...resource, id: crypto.randomUUID() }]
+        courseResources: [...state.courseResources, { ...resource, id: generateId() }]
       })),
 
       addCourseSubject: (subject) => set((state) => ({
-        courseSubjects: [...state.courseSubjects, { ...subject, id: crypto.randomUUID() }]
+        courseSubjects: [...state.courseSubjects, { ...subject, id: generateId() }]
       })),
       deleteCourseSubject: (id) => set((state) => ({
         courseSubjects: state.courseSubjects.filter(s => s.id !== id),
         courseGrades: state.courseGrades.filter(g => g.subjectId !== id)
       })),
       addCourseGrade: (grade) => set((state) => ({
-        courseGrades: [...state.courseGrades, { ...grade, id: crypto.randomUUID() }]
+        courseGrades: [...state.courseGrades, { ...grade, id: generateId() }]
       })),
       updateCourseGrade: (id, grade) => set((state) => ({
         courseGrades: state.courseGrades.map(g => g.id === id ? { ...g, ...grade } : g)
       })),
 
       addDocumentFolder: (folder) => set((state) => ({
-        documentFolders: [...state.documentFolders, { ...folder, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+        documentFolders: [...state.documentFolders, { ...folder, id: generateId(), createdAt: new Date().toISOString() }]
       })),
       updateDocumentFolder: (id, folder) => set((state) => ({
         documentFolders: state.documentFolders.map((f) => (f.id === id ? { ...f, ...folder } : f))
@@ -2424,7 +2446,7 @@ export const useStore = create<AppState>()(
       addDocumentFile: (file) => set((state) => ({
         documentFiles: [...state.documentFiles, { 
           ...file, 
-          id: crypto.randomUUID(), 
+          id: generateId(), 
           version: 1,
           createdAt: new Date().toISOString(), 
           updatedAt: new Date().toISOString() 
@@ -2445,7 +2467,7 @@ export const useStore = create<AppState>()(
         { id: '2', userId: '1', userName: 'Jean Koffi', action: 'Création', target: 'Nouveau Membre', details: 'Ajout de Awa Coulibaly', timestamp: '2026-04-08T10:15:00Z' },
       ],
       addUser: (user) => set((state) => ({
-        users: [...state.users, { ...user, id: crypto.randomUUID(), status: 'active', createdAt: new Date().toISOString() }]
+        users: [...state.users, { ...user, id: generateId(), status: 'active', createdAt: new Date().toISOString() }]
       })),
       updateUser: (id, user) => set((state) => ({
         users: state.users.map((u) => (u.id === id ? { ...u, ...user } : u))
@@ -2454,7 +2476,7 @@ export const useStore = create<AppState>()(
         users: state.users.filter((u) => u.id !== id)
       })),
       addAuditLog: (log) => set((state) => ({
-        auditLogs: [{ ...log, id: crypto.randomUUID(), timestamp: new Date().toISOString() }, ...state.auditLogs].slice(0, 100)
+        auditLogs: [{ ...log, id: generateId(), timestamp: new Date().toISOString() }, ...state.auditLogs].slice(0, 100)
       })),
       
       conversations: [
@@ -2468,14 +2490,14 @@ export const useStore = create<AppState>()(
         { id: '3', conversationId: '3', senderId: '2', content: 'Jean, peux-tu valider le rapport financier ?', timestamp: '2026-04-08T11:00:00Z', readBy: ['2'] },
       ],
       addConversation: (conversation) => {
-        const id = crypto.randomUUID();
+        const id = generateId();
         set((state) => ({
           conversations: [...state.conversations, { ...conversation, id }]
         }));
         return id;
       },
       addMessage: (message) => set((state) => {
-        const id = crypto.randomUUID();
+        const id = generateId();
         const timestamp = new Date().toISOString();
         return {
           messages: [...state.messages, { ...message, id, timestamp, readBy: [message.senderId] }],
@@ -2531,7 +2553,7 @@ export const useStore = create<AppState>()(
         announcements: [
           { 
             ...announcement, 
-            id: crypto.randomUUID(), 
+            id: generateId(), 
             createdAt: new Date().toISOString(),
             readBy: [] 
           }, 
@@ -2552,7 +2574,7 @@ export const useStore = create<AppState>()(
         )
       })),
       addBaptism: (baptism) => set((state) => ({
-        baptisms: [...state.baptisms, { ...baptism, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+        baptisms: [...state.baptisms, { ...baptism, id: generateId(), createdAt: new Date().toISOString() }]
       })),
       updateBaptism: (id, baptism) => set((state) => ({
         baptisms: state.baptisms.map((b) => b.id === id ? { ...b, ...baptism } : b)
@@ -2561,7 +2583,7 @@ export const useStore = create<AppState>()(
         baptisms: state.baptisms.filter((b) => b.id !== id)
       })),
       addWedding: (wedding) => set((state) => ({
-        weddings: [...state.weddings, { ...wedding, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]
+        weddings: [...state.weddings, { ...wedding, id: generateId(), createdAt: new Date().toISOString() }]
       })),
       updateWedding: (id, wedding) => set((state) => ({
         weddings: state.weddings.map((w) => w.id === id ? { ...w, ...wedding } : w)

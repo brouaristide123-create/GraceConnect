@@ -137,7 +137,7 @@ import {
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { cn } from '../lib/utils';
+import { cn, generateId } from '../lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { 
   BarChart, 
@@ -1446,7 +1446,7 @@ function CourseDetail({ course, onClose }: { course: Course; onClose: () => void
 
               {/* Security info */}
               <div className="text-[8px] text-slate-400 font-sans flex justify-between border-t border-slate-100 pt-2">
-                <p>Document authentifié par système ID: {crypto.randomUUID().slice(0, 8)}</p>
+                <p>Document authentifié par système ID: {generateId().slice(0, 8)}</p>
                 <p>Page 1 sur 1</p>
               </div>
             </div>

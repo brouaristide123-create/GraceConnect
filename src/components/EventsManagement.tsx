@@ -64,7 +64,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from './ui/select';
-import { cn } from '../lib/utils';
+import { cn, generateId } from '../lib/utils';
 import { Progress } from './ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Checkbox } from './ui/checkbox';
@@ -906,7 +906,7 @@ function EventDetail({ event, onBack }: { event: Event, onBack: () => void }) {
   const handleAddTask = () => {
     if (!selectedTeam || !newTaskTitle.trim()) return;
     const newTask = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       title: newTaskTitle,
       isCompleted: false
     };
