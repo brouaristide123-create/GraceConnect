@@ -50,7 +50,7 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
 function DialogContent({
   className,
   children,
-  showCloseButton = true,
+  showCloseButton = false,
   ...props
 }: DialogPrimitive.Popup.Props & { showCloseButton?: boolean }) {
   return (
@@ -64,6 +64,8 @@ function DialogContent({
           // Dimensions
           "w-full max-w-[calc(100%-2rem)] sm:max-w-2xl",
           "max-h-[90vh] overflow-y-auto",
+          // Padding horizontal — fournit l'indentation par défaut au contenu
+          "px-6",
           // Style identique à la capture d'écran
           "bg-white dark:bg-zinc-900",
           "border border-slate-300 dark:border-zinc-700",
@@ -111,6 +113,8 @@ function DialogHeader({ className, children, ...props }: React.ComponentProps<"d
       className={cn(
         // Sticky dans la zone scrollable
         "sticky top-0 z-10",
+        // -mx-6 annule le px-6 du parent DialogContent → border-b pleine largeur
+        "-mx-6",
         // Style
         "flex items-center justify-between gap-4",
         "px-6 py-4",
@@ -145,7 +149,7 @@ function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-body"
-      className={cn("px-6 py-5", className)}
+      className={cn("-mx-6 px-6 py-5", className)}
       {...props}
     />
   )
@@ -166,6 +170,8 @@ function DialogFooter({
       className={cn(
         // Sticky en bas
         "sticky bottom-0 z-10",
+        // -mx-6 annule le px-6 du parent DialogContent → border-t pleine largeur
+        "-mx-6",
         // Style
         "flex flex-wrap items-center justify-end gap-3",
         "px-6 py-4",
