@@ -1870,7 +1870,7 @@ function CaseDetail({ funeralCase, onClose }: { funeralCase: FuneralCase; onClos
 }
 
 export function FuneralManagement() {
-  const { funeralCases, funeralContributions, contributionTypes, contributionPayments, churches, members, addFuneralCase, addContributionPayment, cashRegisters } = useStore();
+  const { funeralCases, funeralContributions, contributionTypes, contributionPayments, churches, members, addFuneralCase, addContributionPayment, cashRegisters, currentUser } = useStore();
   const [selectedCaseId, setSelectedCaseId] = React.useState<string | null>(null);
   const [selectedContributionTypeId, setSelectedContributionTypeId] = React.useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
@@ -1898,7 +1898,7 @@ export function FuneralManagement() {
       dateOfDeath: new Date().toISOString().split('T')[0],
       location: '',
       description: '',
-      churchId: churches[0]?.id || '1',
+      churchId: currentUser?.churchId || churches[0]?.id || '1',
     },
   });
 

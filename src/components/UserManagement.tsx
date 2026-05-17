@@ -95,7 +95,7 @@ const userSchema = z.object({
 type UserFormValues = z.infer<typeof userSchema>;
 
 export function UserManagement() {
-  const { users, auditLogs, addUser, updateUser, deleteUser, addAuditLog, departments } = useStore();
+  const { users, auditLogs, addUser, updateUser, deleteUser, addAuditLog, departments, currentUser } = useStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -140,11 +140,11 @@ export function UserManagement() {
       role: 'member', // Default role
       identifier: generatedId,
       resetPasswordRequired: true,
-      churchId: '1',
+      churchId: currentUser?.churchId || '1',
     });
     addAuditLog({
-      userId: '1', // Mock current user
-      userName: 'Jean Koffi',
+      userId: currentUser?.id || '1',
+      userName: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Admin',
       action: 'Création',
       target: `Utilisateur: ${values.firstName} ${values.lastName} (${generatedId})`,
       details: `Fonction: ${values.position}`
@@ -158,8 +158,8 @@ export function UserManagement() {
     const newStatus = user.status === 'active' ? 'inactive' : 'active';
     updateUser(user.id, { status: newStatus });
     addAuditLog({
-      userId: '1',
-      userName: 'Jean Koffi',
+      userId: currentUser?.id || '1',
+      userName: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Admin',
       action: newStatus === 'active' ? 'Activation' : 'Désactivation',
       target: `Utilisateur: ${user.firstName} ${user.lastName}`,
     });

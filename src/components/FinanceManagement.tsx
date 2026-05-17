@@ -85,7 +85,7 @@ import {
   FormMessage 
 } from './ui/form';
 import { motion } from 'motion/react';
-import { format } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
@@ -218,22 +218,58 @@ export function FinanceManagement() {
   const netBalance = income - expenses;
   const savingsRate = income > 0 ? Math.round((netBalance / income) * 100) : 0;
 
+  const now = new Date();
+  const currentMonthStart = startOfMonth(now);
+  const currentMonthEnd = endOfMonth(now);
+  const lastMonthStart = startOfMonth(subMonths(now, 1));
+  const lastMonthEnd = endOfMonth(subMonths(now, 1));
+
   const currentMonthIncome = transactions
-    .filter(t => t.type !== 'expense' && new Date(t.date).getMonth() === new Date().getMonth())
+    .filter(t => {
+      try { const d = parseISO(t.date); return t.type !== 'expense' && d >= currentMonthStart && d <= currentMonthEnd; } catch { return false; }
+    })
     .reduce((acc, t) => acc + t.amount, 0);
 
-  const lastMonthIncome = 450000; // Mock for comparison
-  const incomeEvolution = ((currentMonthIncome - lastMonthIncome) / lastMonthIncome) * 100;
+  const computedLastMonthIncome = transactions
+    .filter(t => {
+      try { const d = parseISO(t.date); return t.type !== 'expense' && d >= lastMonthStart && d <= lastMonthEnd; } catch { return false; }
+    })
+    .reduce((acc, t) => acc + t.amount, 0);
 
-  const chartData = [
-    { name: 'Jan', income: 400000, expenses: 240000 },
-    { name: 'Feb', income: 300000, expenses: 139800 },
-    { name: 'Mar', income: 200000, expenses: 980000 },
-    { name: 'Apr', income: 278000, expenses: 390800 },
-    { name: 'May', income: 189000, expenses: 480000 },
-    { name: 'Jun', income: 239000, expenses: 380000 },
-    { name: 'Jul', income: 349000, expenses: 430000 },
-  ];
+  const incomeEvolution = computedLastMonthIncome > 0
+    ? ((currentMonthIncome - computedLastMonthIncome) / computedLastMonthIncome) * 100
+    : 0;
+
+  // Build real chart data from transactions filtered by chartPeriod
+  const chartData = React.useMemo(() => {
+    const today = new Date();
+    const monthCount = chartPeriod === 'week' ? 1 : chartPeriod === 'month' ? 1 : chartPeriod === '3m' ? 3 : chartPeriod === '6m' ? 6 : chartPeriod === '1y' ? 12 : 6;
+    const points = chartPeriod === 'week' ? 7 : monthCount;
+    return Array.from({ length: points }, (_, i) => {
+      if (chartPeriod === 'week') {
+        const dayDate = new Date(today);
+        dayDate.setDate(today.getDate() - (points - 1 - i));
+        const dayStr = dayDate.toISOString().slice(0, 10);
+        const dayTx = transactions.filter(t => t.date && t.date.startsWith(dayStr));
+        return {
+          name: format(dayDate, 'EEE', { locale: fr }),
+          income: dayTx.filter(t => t.type !== 'expense').reduce((s, t) => s + t.amount, 0),
+          expenses: dayTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
+        };
+      }
+      const monthDate = subMonths(today, points - 1 - i);
+      const mStart = startOfMonth(monthDate);
+      const mEnd = endOfMonth(monthDate);
+      const monthTx = transactions.filter(t => {
+        try { const d = parseISO(t.date); return d >= mStart && d <= mEnd; } catch { return false; }
+      });
+      return {
+        name: format(monthDate, 'MMM', { locale: fr }),
+        income: monthTx.filter(t => t.type !== 'expense').reduce((s, t) => s + t.amount, 0),
+        expenses: monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
+      };
+    });
+  }, [transactions, chartPeriod]);
 
   const expenseDistribution = React.useMemo(() => {
     const expensesList = transactions.filter(t => t.type === 'expense');

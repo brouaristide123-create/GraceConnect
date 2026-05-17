@@ -984,7 +984,7 @@ function ProjectDetail({ project, onClose }: { project: ChurchProject; onClose: 
 }
 
 export function ProjectManagement() {
-  const { churchProjects, projectContributions, churches, members, addChurchProject } = useStore();
+  const { churchProjects, projectContributions, churches, members, addChurchProject, currentUser } = useStore();
   const [selectedProjectId, setSelectedProjectId] = React.useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [hasEndDate, setHasEndDate] = React.useState(false);
@@ -998,7 +998,7 @@ export function ProjectManagement() {
       totalBudget: 0,
       startDate: new Date().toISOString().split('T')[0],
       endDate: null,
-      churchId: churches[0]?.id || '1',
+      churchId: currentUser?.churchId || churches[0]?.id || '1',
     },
   });
 

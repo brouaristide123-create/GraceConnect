@@ -46,7 +46,8 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 export function CeremonyManagement() {
-  const { baptisms, weddings, members, addBaptism, addWedding } = useStore();
+  const { baptisms, weddings, members, addBaptism, addWedding, currentUser } = useStore();
+  const churchId = currentUser?.churchId || '1';
   const [searchTerm, setSearchTerm] = React.useState('');
   const [isNewDialogOpen, setIsNewDialogOpen] = React.useState(false);
   const [ceremonyType, setCeremonyType] = React.useState<'none' | 'baptism' | 'wedding'>('none');
@@ -221,12 +222,12 @@ export function CeremonyManagement() {
     if (ceremonyType === 'baptism') {
       addBaptism({
         ...baptismForm,
-        churchId: '1', // Hardcoded for demo
+        churchId: churchId,
       });
     } else {
       addWedding({
         ...weddingForm,
-        churchId: '1', // Hardcoded for demo
+        churchId: churchId,
         prepSessions: [],
       });
     }

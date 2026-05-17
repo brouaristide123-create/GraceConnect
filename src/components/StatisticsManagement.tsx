@@ -107,19 +107,22 @@ const AnimatedNumber = ({ value, prefix = "", suffix = "" }: { value: number, pr
 };
 
 export function StatisticsManagement() {
-  const { 
-    members, 
-    children, 
-    services, 
-    events, 
-    transactions, 
-    attendance, 
-    contributionPayments, 
-    churchProjects, 
+  const {
+    members,
+    children,
+    services,
+    events,
+    transactions,
+    attendance,
+    contributionPayments,
+    contributionTypes,
+    childCheckIns,
+    churchProjects,
     projectContributions,
-    courses, 
+    courses,
     courseEnrollments,
-    eventRegistrations
+    eventRegistrations,
+    currentUser,
   } = useStore();
 
   const [period, setPeriod] = useState<'week' | 'month' | 'year'>('month');
@@ -334,6 +337,48 @@ export function StatisticsManagement() {
     { name: 'Adultes', value: members.length },
     { name: 'Enfants', value: children.length },
   ];
+
+  // --- Computed Contribution Payment Rate ---
+  const churchId = currentUser?.churchId;
+  const churchMembers = members.filter(m => !churchId || m.churchId === churchId);
+  const totalMembersCount = churchMembers.length;
+  const now2 = new Date();
+  const currentMonthKey = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`;
+  const paidThisMonth = new Set(
+    contributionPayments
+      .filter(p => p.status === 'paid' && p.date.startsWith(currentMonthKey))
+      .map(p => p.memberId)
+  ).size;
+  const contributionPaymentRate = totalMembersCount > 0
+    ? Math.round((paidThisMonth / totalMembersCount) * 100)
+    : 0;
+
+  // --- Computed Training Stats ---
+  const completedEnrollments = courseEnrollments.filter(e => e.status === 'completed').length;
+  const trainingSuccessRate = courseEnrollments.length > 0
+    ? Math.round((completedEnrollments / courseEnrollments.length) * 100)
+    : 0;
+  const avgCourseProgress = courseEnrollments.length > 0
+    ? Math.round(courseEnrollments.reduce((s, e) => s + (e.progress || 0), 0) / courseEnrollments.length)
+    : 0;
+
+  // --- Computed Children Stats ---
+  const activeChildren = children.filter(c => c.status === 'active').length;
+  const checkedInToday = childCheckIns.filter(ci => {
+    try { return ci.date.startsWith(now2.toISOString().slice(0, 10)); } catch { return false; }
+  }).length;
+  const childAttendanceRate = activeChildren > 0
+    ? Math.round((checkedInToday / activeChildren) * 100)
+    : 0;
+  const newChildrenThisMonth = children.filter(c => {
+    try { return c.joinedAt && c.joinedAt.startsWith(currentMonthKey); } catch { return false; }
+  }).length;
+
+  // --- Computed Event Stats ---
+  const checkedInCount = eventRegistrations.filter(r => r.isCheckedIn).length;
+  const eventAttendanceRate = eventRegistrations.length > 0
+    ? Math.round((checkedInCount / eventRegistrations.length) * 100)
+    : 0;
 
   // 6. Insights Generation
   const insights = useMemo(() => {
@@ -874,10 +919,10 @@ export function StatisticsManagement() {
                 <div className="mt-6 space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-500">Taux de paiement cotisations</span>
-                    <span className="font-bold text-emerald-600">72%</span>
+                    <span className="font-bold text-emerald-600">{contributionPaymentRate}%</span>
                   </div>
-                  <Progress value={72} className="h-1.5 bg-slate-100" />
-                  <p className="text-[10px] text-slate-400 italic text-center">"70% des membres ont payé leur cotisation ce mois"</p>
+                  <Progress value={contributionPaymentRate} className="h-1.5 bg-slate-100" />
+                  <p className="text-[10px] text-slate-400 italic text-center">"{contributionPaymentRate}% des membres ont payé leur cotisation ce mois"</p>
                 </div>
               </CardContent>
             </Card>
@@ -905,11 +950,11 @@ export function StatisticsManagement() {
                   </div>
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-500">Taux de réussite</span>
-                    <span className="font-bold text-emerald-600">85%</span>
+                    <span className="font-bold text-emerald-600">{trainingSuccessRate}%</span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-500">Progression moy.</span>
-                    <span className="font-bold text-blue-600">64%</span>
+                    <span className="font-bold text-blue-600">{avgCourseProgress}%</span>
                   </div>
                 </div>
               </CardContent>
@@ -929,12 +974,12 @@ export function StatisticsManagement() {
                 </div>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-500">Présence moyenne</span>
-                    <span className="font-bold">92%</span>
+                    <span className="text-slate-500">Présents aujourd'hui</span>
+                    <span className="font-bold">{childAttendanceRate}%</span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-500">Nouveaux ce mois</span>
-                    <span className="font-bold text-emerald-600">+3</span>
+                    <span className="font-bold text-emerald-600">+{newChildrenThisMonth}</span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-500">Groupes d'âge</span>
@@ -963,13 +1008,11 @@ export function StatisticsManagement() {
                   </div>
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-500">Taux de présence</span>
-                    <span className="font-bold text-emerald-600">
-                      {Math.round((eventRegistrations.filter(r => r.isCheckedIn).length / eventRegistrations.length) * 100)}%
-                    </span>
+                    <span className="font-bold text-emerald-600">{eventAttendanceRate}%</span>
                   </div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-slate-500">Satisfaction moy.</span>
-                    <span className="font-bold text-amber-600">4.8/5</span>
+                    <span className="text-slate-500">Check-ins confirmés</span>
+                    <span className="font-bold text-amber-600">{checkedInCount}</span>
                   </div>
                 </div>
               </CardContent>
@@ -989,29 +1032,45 @@ export function StatisticsManagement() {
           </CardHeader>
           <CardContent>
             <div className="divide-y divide-slate-100">
-              {[
-                { name: 'Rapport Mensuel - Mars 2026', type: 'PDF', size: '1.2 MB', date: '01/04/2026' },
-                { name: 'Bilan Financier Trimestriel Q1', type: 'Excel', size: '850 KB', date: '31/03/2026' },
-                { name: 'Statistiques de Fréquentation Annuelle', type: 'PDF', size: '2.4 MB', date: '15/03/2026' },
-              ].map((report, idx) => (
-                <div key={idx} className="flex items-center justify-between py-3 group cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "p-2 rounded-lg",
-                      report.type === 'PDF' ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
-                    )}>
-                      {report.type === 'PDF' ? <FileText className="w-4 h-4" /> : <FileSpreadsheet className="w-4 h-4" />}
+              {(() => {
+                // Build dynamic report list from recent services and events
+                const reportItems = [
+                  ...services.slice(-2).map(s => ({
+                    name: `Rapport Culte — ${s.theme || 'Culte'}`,
+                    type: 'PDF' as const,
+                    date: s.date ? format(parseISO(s.date), 'dd/MM/yyyy') : '—',
+                    detail: s.preacher,
+                  })),
+                  ...events.filter(e => e.status === 'completed').slice(-1).map(e => ({
+                    name: `Bilan Événement — ${e.name}`,
+                    type: 'Excel' as const,
+                    date: e.endDate ? format(parseISO(e.endDate), 'dd/MM/yyyy') : '—',
+                    detail: e.location,
+                  })),
+                ];
+                if (reportItems.length === 0) {
+                  return <p className="text-xs text-slate-400 italic py-4 text-center">Aucun rapport disponible.</p>;
+                }
+                return reportItems.map((report, idx) => (
+                  <div key={idx} className="flex items-center justify-between py-3 group cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "p-2 rounded-lg",
+                        report.type === 'PDF' ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+                      )}>
+                        {report.type === 'PDF' ? <FileText className="w-4 h-4" /> : <FileSpreadsheet className="w-4 h-4" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium group-hover:text-blue-600 transition-colors">{report.name}</p>
+                        <p className="text-[10px] text-slate-400">{report.date} · {report.detail}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium group-hover:text-blue-600 transition-colors">{report.name}</p>
-                      <p className="text-[10px] text-slate-400">{report.date} • {report.size}</p>
-                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Download className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           </CardContent>
         </Card>

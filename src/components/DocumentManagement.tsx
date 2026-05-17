@@ -329,16 +329,17 @@ function DocumentDetail({ file, onClose }: { file: DocumentFile; onClose: () => 
 }
 
 export function DocumentManagement() {
-  const { 
-    documentFolders, 
-    documentFiles, 
-    members, 
-    churches, 
-    addDocumentFile, 
-    addDocumentFolder, 
+  const {
+    documentFolders,
+    documentFiles,
+    members,
+    churches,
+    addDocumentFile,
+    addDocumentFolder,
     deleteDocumentFolder,
     deleteDocumentFile,
-    toggleFavoriteDocument 
+    toggleFavoriteDocument,
+    currentUser,
   } = useStore();
   const [selectedFileId, setSelectedFileId] = React.useState<string | null>(null);
   const [currentFolderId, setCurrentFolderId] = React.useState<string | null>(null);
@@ -381,7 +382,7 @@ export function DocumentManagement() {
       folderId: currentFolderId || undefined,
       type: 'pdf',
       accessLevel: 'public',
-      churchId: churches[0]?.id || '1',
+      churchId: currentUser?.churchId || churches[0]?.id || '1',
     },
   });
 
@@ -434,7 +435,7 @@ export function DocumentManagement() {
     addDocumentFolder({
       name: newFolderName,
       parentId: currentFolderId || undefined,
-      churchId: churches[0]?.id || '1'
+      churchId: currentUser?.churchId || churches[0]?.id || '1'
     });
     setNewFolderName('');
     setIsAddFolderDialogOpen(false);

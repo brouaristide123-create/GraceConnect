@@ -1,10 +1,10 @@
 import React from 'react';
-import { 
-  Building2, 
-  Users, 
-  CreditCard, 
-  TrendingUp, 
-  ArrowUpRight, 
+import {
+  Building2,
+  Users,
+  CreditCard,
+  TrendingUp,
+  ArrowUpRight,
   ArrowDownRight,
   Plus,
   MoreHorizontal,
@@ -23,6 +23,7 @@ import { Progress } from '../ui/progress';
 import { motion } from 'motion/react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 
 interface StatCardProps {
   title: string;
@@ -55,40 +56,58 @@ function StatCard({ title, value, icon: Icon, trend, color }: StatCardProps) {
 }
 
 export function AdminDashboard() {
-  const { churches, platformStats, subscriptions, subscriptionPlans } = useStore();
+  const { churches, users, subscriptions, subscriptionPlans, updateChurch } = useStore();
+  const navigate = useNavigate();
 
-  const recentChurches = [...churches].sort((a, b) => 
+  const recentChurches = [...churches].sort((a, b) =>
     parseISO(b.createdAt).getTime() - parseISO(a.createdAt).getTime()
   ).slice(0, 5);
 
+  // Compute real platform stats from store data
+  const totalChurches = churches.length;
+  const activeChurches = churches.filter(c => c.status === 'active').length;
+  const pendingChurches = churches.filter(c => c.status === 'pending').length;
+  const totalUsers = users.length;
+
+  // Revenue: sum of active subscriptions fees
+  const totalRevenue = subscriptions
+    .filter(s => s.status === 'active')
+    .reduce((sum, s) => {
+      const plan = subscriptionPlans.find(p => p.id === s.planId);
+      return sum + (plan?.price || 0);
+    }, 0);
+
+  // Growth: percentage of active vs total churches
+  const growthRate = totalChurches > 0 ? Math.round((activeChurches / totalChurches) * 100) : 0;
+
   const stats = [
-    { 
-      title: 'Total Églises', 
-      value: platformStats.totalChurches, 
-      icon: Building2, 
-      trend: { trendValue: '+12%', positive: true }, 
-      color: 'bg-indigo-500' 
+    {
+      title: 'Total Églises',
+      value: totalChurches,
+      icon: Building2,
+      trend: { trendValue: `${activeChurches} actives`, positive: true },
+      color: 'bg-indigo-500'
     },
-    { 
-      title: 'Utilisateurs Actifs', 
-      value: platformStats.totalUsers, 
-      icon: Users, 
-      trend: { trendValue: '+8%', positive: true }, 
-      color: 'bg-emerald-500' 
+    {
+      title: 'Utilisateurs Actifs',
+      value: totalUsers,
+      icon: Users,
+      trend: { trendValue: `${users.filter(u => u.status === 'active').length} actifs`, positive: true },
+      color: 'bg-emerald-500'
     },
-    { 
-      title: 'Revenus Mensuels', 
-      value: `${platformStats.totalRevenue.toLocaleString()} FCFA`, 
-      icon: CreditCard, 
-      trend: { trendValue: '+5%', positive: true }, 
-      color: 'bg-amber-500' 
+    {
+      title: 'Revenus Abonnements',
+      value: `${totalRevenue.toLocaleString('fr-FR')} FCFA`,
+      icon: CreditCard,
+      trend: { trendValue: `${subscriptions.filter(s => s.status === 'active').length} abos`, positive: true },
+      color: 'bg-amber-500'
     },
-    { 
-      title: 'Taux de Croissance', 
-      value: '22%', 
-      icon: TrendingUp, 
-      trend: { trendValue: '+15%', positive: true }, 
-      color: 'bg-purple-500' 
+    {
+      title: 'Taux Activation',
+      value: `${growthRate}%`,
+      icon: TrendingUp,
+      trend: { trendValue: `${pendingChurches} en attente`, positive: pendingChurches === 0 },
+      color: 'bg-purple-500'
     },
   ];
 
@@ -109,8 +128,8 @@ export function AdminDashboard() {
           <p className="text-slate-500 mt-1">Bienvenue sur la console Super Admin de Grace-Connect.</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" className="rounded-xl h-11 border-slate-200">Exporter les données</Button>
-          <Button className="bg-slate-900 rounded-xl h-11">Nouvelle Église</Button>
+          <Button variant="outline" className="rounded-xl h-11 border-slate-200" onClick={() => navigate('/admin/churches')}>Exporter les données</Button>
+          <Button className="bg-slate-900 rounded-xl h-11" onClick={() => navigate('/admin/churches')}>Nouvelle Église</Button>
         </div>
       </div>
 
@@ -134,7 +153,7 @@ export function AdminDashboard() {
               <CardTitle className="text-2xl font-serif font-bold">Églises Récemment Inscrites</CardTitle>
               <CardDescription>Suivi des 5 dernières inscriptions sur la plateforme.</CardDescription>
             </div>
-            <Button variant="ghost" className="text-church-gold font-bold">Voir tout</Button>
+            <Button variant="ghost" className="text-church-gold font-bold" onClick={() => navigate('/admin/churches')}>Voir tout</Button>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -221,8 +240,8 @@ export function AdminDashboard() {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" size="sm" className="bg-white border-amber-200 text-amber-700 hover:bg-amber-100 h-9 rounded-lg">Détails</Button>
-                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 rounded-lg">Valider</Button>
+                      <Button variant="outline" size="sm" className="bg-white border-amber-200 text-amber-700 hover:bg-amber-100 h-9 rounded-lg" onClick={() => navigate('/admin/churches')}>Détails</Button>
+                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 rounded-lg" onClick={() => updateChurch(church.id, { status: 'active' })}>Valider</Button>
                     </div>
                   </div>
                 ))

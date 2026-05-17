@@ -1959,7 +1959,7 @@ function CertificatesView({
 }
 
 export function TrainingManagement() {
-  const { courses, courseEnrollments, members, churches, addCourse } = useStore();
+  const { courses, courseEnrollments, members, churches, addCourse, currentUser } = useStore();
   const [selectedCourseId, setSelectedCourseId] = React.useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
 
@@ -1971,7 +1971,7 @@ export function TrainingManagement() {
       level: 'beginner',
       instructorId: '',
       duration: '4 semaines',
-      churchId: churches[0]?.id || '1',
+      churchId: currentUser?.churchId || churches[0]?.id || '1',
     },
   });
 

@@ -378,7 +378,7 @@ function AssignmentDetail({ assignment, onClose }: { assignment: Assignment; onC
 }
 
 export function AssignmentManagement() {
-  const { assignments, assignmentMembers, members, churches, addAssignment } = useStore();
+  const { assignments, assignmentMembers, members, churches, addAssignment, currentUser } = useStore();
   const [selectedAssignmentId, setSelectedAssignmentId] = React.useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<'list' | 'calendar'>('list');
@@ -430,7 +430,7 @@ export function AssignmentManagement() {
         location: 'Temple Principal',
         description: 'Généré automatiquement par l\'IA',
         recurrence: 'none',
-        churchId: churches[0]?.id || '1',
+        churchId: currentUser?.churchId || churches[0]?.id || '1',
         status: 'planned'
       } as any);
       // In a real app we would also add the assignmentMembers here

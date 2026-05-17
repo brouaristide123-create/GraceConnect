@@ -1,10 +1,10 @@
 import React from 'react';
-import { 
-  Users, 
-  TrendingUp, 
-  Wallet, 
-  Calendar, 
-  ArrowUpRight, 
+import {
+  Users,
+  TrendingUp,
+  Wallet,
+  Calendar,
+  ArrowUpRight,
   ArrowDownRight,
   Plus,
   Activity
@@ -12,84 +12,122 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { useStore } from '../lib/store';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   LineChart,
   Line
 } from 'recharts';
-import { format } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 import { cn } from '../lib/utils';
 
 export function Dashboard() {
-  const { churches, members, transactions, events } = useStore();
+  const { churches, members, transactions, events, currentUser } = useStore();
+  const navigate = useNavigate();
 
-  const totalMembers = members?.length || 0;
-  const totalChurches = churches?.length || 0;
-  
-  const income = (transactions || [])
+  const churchId = currentUser?.churchId;
+
+  // Filter data by current church
+  const churchMembers = (members || []).filter(m => !churchId || m.churchId === churchId);
+  const churchTransactions = (transactions || []).filter(t => !churchId || t.churchId === churchId);
+  const churchEvents = (events || []).filter(e => !churchId || e.churchId === churchId);
+  const churchBranches = churchId ? churches.filter(c => c.id === churchId) : churches;
+
+  const totalMembers = churchMembers.length;
+  const totalChurches = churchBranches.length;
+
+  const income = churchTransactions
     .filter(t => t.type !== 'expense')
     .reduce((acc, t) => acc + t.amount, 0);
-    
-  const expenses = (transactions || [])
+
+  const expenses = churchTransactions
     .filter(t => t.type === 'expense')
     .reduce((acc, t) => acc + t.amount, 0);
 
   const balance = income - expenses;
 
-  // Mock data for charts if empty
-  const chartData = [
-    { name: 'Jan', income: 4000, expenses: 2400 },
-    { name: 'Fév', income: 3000, expenses: 1398 },
-    { name: 'Mar', income: 2000, expenses: 9800 },
-    { name: 'Avr', income: 2780, expenses: 3908 },
-    { name: 'Mai', income: 1890, expenses: 4800 },
-    { name: 'Juin', income: 2390, expenses: 3800 },
-  ];
+  const upcomingEvents = churchEvents.filter(e => e.status === 'upcoming').length;
+
+  // Build real 6-month chart data from transactions
+  const now = new Date();
+  const chartData = Array.from({ length: 6 }, (_, i) => {
+    const monthDate = subMonths(now, 5 - i);
+    const label = format(monthDate, 'MMM', { locale: fr });
+    const monthStart = startOfMonth(monthDate);
+    const monthEnd = endOfMonth(monthDate);
+    const monthTx = churchTransactions.filter(t => {
+      try {
+        const d = parseISO(t.date);
+        return d >= monthStart && d <= monthEnd;
+      } catch { return false; }
+    });
+    return {
+      name: label,
+      income: monthTx.filter(t => t.type !== 'expense').reduce((s, t) => s + t.amount, 0),
+      expenses: monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
+    };
+  });
+
+  // Compute last month income for trend
+  const lastMonth = subMonths(now, 1);
+  const lastMonthIncome = churchTransactions
+    .filter(t => t.type !== 'expense')
+    .filter(t => { try { return isSameMonth(parseISO(t.date), lastMonth); } catch { return false; } })
+    .reduce((s, t) => s + t.amount, 0);
+  const currentMonthIncome = churchTransactions
+    .filter(t => t.type !== 'expense')
+    .filter(t => { try { return isSameMonth(parseISO(t.date), now); } catch { return false; } })
+    .reduce((s, t) => s + t.amount, 0);
+  const incomeTrendPct = lastMonthIncome > 0
+    ? Math.round(((currentMonthIncome - lastMonthIncome) / lastMonthIncome) * 100)
+    : 0;
+
+  const userName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Pasteur';
 
   const stats = [
-    { 
-      name: 'Membres Totaux', 
-      value: totalMembers, 
-      icon: Users, 
-      color: 'text-blue-600', 
+    {
+      name: 'Membres Totaux',
+      value: totalMembers,
+      icon: Users,
+      color: 'text-blue-600',
       bg: 'bg-blue-50',
-      change: '+12%',
+      change: `${churchMembers.filter(m => m.status === 'active').length} actifs`,
       trend: 'up'
     },
-    { 
-      name: 'Églises / Branches', 
-      value: totalChurches, 
-      icon: TrendingUp, 
-      color: 'text-green-600', 
+    {
+      name: 'Églises / Branches',
+      value: totalChurches,
+      icon: TrendingUp,
+      color: 'text-green-600',
       bg: 'bg-green-50',
-      change: '+2',
+      change: `${churches.filter(c => c.status === 'active').length} actives`,
       trend: 'up'
     },
-    { 
-      name: 'Revenus (FCFA)', 
-      value: income.toLocaleString(), 
-      icon: Wallet, 
-      color: 'text-amber-600', 
+    {
+      name: 'Revenus (FCFA)',
+      value: income.toLocaleString('fr-FR'),
+      icon: Wallet,
+      color: 'text-amber-600',
       bg: 'bg-amber-50',
-      change: '+8%',
-      trend: 'up'
+      change: incomeTrendPct >= 0 ? `+${incomeTrendPct}%` : `${incomeTrendPct}%`,
+      trend: incomeTrendPct >= 0 ? 'up' : 'down'
     },
-    { 
-      name: 'Événements à venir', 
-      value: events?.length || 0, 
-      icon: Calendar, 
-      color: 'text-purple-600', 
+    {
+      name: 'Événements à venir',
+      value: upcomingEvents,
+      icon: Calendar,
+      color: 'text-purple-600',
       bg: 'bg-purple-50',
-      change: 'Cette semaine',
+      change: `${churchEvents.length} total`,
       trend: 'neutral'
     },
   ];
@@ -98,12 +136,12 @@ export function Dashboard() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-slate-900">Bienvenue, Pasteur</h1>
+          <h1 className="text-3xl font-serif font-bold text-slate-900">Bienvenue, {userName}</h1>
           <p className="text-slate-500">Voici un aperçu de l'activité de votre ministère aujourd'hui.</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" className="hidden sm:flex">Exporter Rapport</Button>
-          <Button className="bg-church-green hover:bg-church-green/90">
+          <Button variant="outline" className="hidden sm:flex" onClick={() => navigate('/stats')}>Exporter Rapport</Button>
+          <Button className="bg-church-green hover:bg-church-green/90" onClick={() => navigate('/finances')}>
             <Plus className="w-4 h-4 mr-2" />
             Nouvelle Entrée
           </Button>
@@ -191,12 +229,12 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {transactions.length === 0 ? (
+              {churchTransactions.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-slate-400 text-sm italic">Aucune activité récente</p>
                 </div>
               ) : (
-                transactions.slice(0, 5).map((t) => (
+                churchTransactions.slice(0, 5).map((t) => (
                   <div key={t.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={cn(
@@ -220,7 +258,7 @@ export function Dashboard() {
                 ))
               )}
             </div>
-            <Button variant="ghost" className="w-full mt-6 text-church-green font-medium">
+            <Button variant="ghost" className="w-full mt-6 text-church-green font-medium" onClick={() => navigate('/activities')}>
               Voir tout
             </Button>
           </CardContent>

@@ -433,7 +433,8 @@ export function ContributionsManagement() {
     contributionGoals,
     churches,
     addContributionPayment,
-    addContributionType
+    addContributionType,
+    currentUser,
   } = useStore();
 
   const [selectedTypeId, setSelectedTypeId] = React.useState<string | null>(null);
@@ -462,7 +463,7 @@ export function ContributionsManagement() {
       amount: 0,
       frequency: 'monthly',
       deadline: '',
-      churchId: churches[0]?.id || '1'
+      churchId: currentUser?.churchId || churches[0]?.id || '1'
     },
   });
 

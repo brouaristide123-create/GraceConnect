@@ -163,9 +163,9 @@ const calculateAge = (birthDate: string | undefined): number | null => {
 };
 
 export function MemberManagement() {
-  const { 
-    members, 
-    churches, 
+  const {
+    members,
+    churches,
     departments,
     departmentMembers,
     services,
@@ -173,10 +173,13 @@ export function MemberManagement() {
     eventRegistrations,
     pastoralNotes,
     trainings,
-    addMember, 
-    updateMember, 
-    deleteMember 
+    addMember,
+    updateMember,
+    deleteMember,
+    currentUser,
   } = useStore();
+
+  const churchId = currentUser?.churchId;
   
   const [searchTerm, setSearchTerm] = React.useState('');
   const [activeTab, setActiveTab] = React.useState('active');
@@ -221,7 +224,7 @@ export function MemberManagement() {
       address: '',
       city: '',
       neighborhood: '',
-      churchId: churches[0]?.id || '',
+      churchId: churchId || churches[0]?.id || '',
       status: 'new',
       gender: 'M',
       birthDate: '',
@@ -405,7 +408,7 @@ export function MemberManagement() {
       address: '',
       city: '',
       neighborhood: '',
-      churchId: churches[0]?.id || '',
+      churchId: churchId || churches[0]?.id || '',
       status: 'new',
       gender: 'M',
       birthDate: initialData?.birthDate || '',
@@ -443,26 +446,28 @@ export function MemberManagement() {
     setIsAddDialogOpen(true);
   };
 
-  const filteredMembers = members.filter(m => {
+  const churchMembers = members.filter(m => !churchId || m.churchId === churchId);
+
+  const filteredMembers = churchMembers.filter(m => {
     const matchesTab = activeTab === 'archives' ? m.status === 'archived' : m.status !== 'archived';
-    const matchesSearch = 
-      `${m.firstName} ${m.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const matchesSearch =
+      `${m.firstName} ${m.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.phone.includes(searchTerm) ||
       (m.matricule && m.matricule.toLowerCase().includes(searchTerm.toLowerCase()));
-    
+
     const matchesGender = filterGender === 'all' || m.gender === filterGender;
     const matchesStatus = filterStatus === 'all' || m.status === filterStatus;
     const matchesDept = filterDept === 'all' || departmentMembers.some(dm => dm.memberId === m.id && dm.departmentId === filterDept);
     const matchesGroup = filterGroup === 'all' || m.groups.includes(filterGroup);
-    
+
     return matchesTab && matchesSearch && matchesGender && matchesStatus && matchesDept && matchesGroup;
   });
 
   const stats = {
-    total: members.length,
-    active: members.filter(m => m.status === 'active').length,
-    inactive: members.filter(m => m.status === 'inactive').length,
-    newThisMonth: members.filter(m => {
+    total: churchMembers.length,
+    active: churchMembers.filter(m => m.status === 'active').length,
+    inactive: churchMembers.filter(m => m.status === 'inactive').length,
+    newThisMonth: churchMembers.filter(m => {
       const joined = new Date(m.joinedAt);
       const now = new Date();
       return joined.getMonth() === now.getMonth() && joined.getFullYear() === now.getFullYear();
